@@ -1,0 +1,11 @@
+import { StyleSheet, View } from 'react-native';
+
+const nodes = [{ top: '7%', left: '38%', size: 10 }, { top: '17%', left: '72%', size: 8 }, { top: '35%', left: '84%', size: 12 }, { top: '70%', left: '75%', size: 8 }, { top: '88%', left: '47%', size: 11 }, { top: '76%', left: '12%', size: 9 }, { top: '38%', left: '5%', size: 8 }, { top: '20%', left: '17%', size: 12 }];
+
+export function NeuralOrb() {
+  return <View style={styles.frame}><View style={[styles.ring, styles.ringOuter]} /><View style={[styles.ring, styles.ringWide]} /><View style={[styles.ring, styles.ringTall]} /><View style={styles.horizontalRay} /><View style={styles.verticalRay} /><View style={styles.star}><View style={styles.starCore} /></View>{nodes.map((node) => <View key={`${node.top}-${node.left}`} style={[styles.node, { top: node.top as `${number}%`, left: node.left as `${number}%`, width: node.size, height: node.size }]} />)}</View>;
+}
+
+const styles = StyleSheet.create({
+  frame: { width: 280, height: 280, alignItems: 'center', justifyContent: 'center' }, ring: { position: 'absolute', borderWidth: 1, borderColor: '#A8FF00', opacity: 0.45 }, ringOuter: { width: 230, height: 230, borderRadius: 115 }, ringWide: { width: 274, height: 130, borderRadius: 137, transform: [{ rotate: '22deg' }] }, ringTall: { width: 130, height: 274, borderRadius: 137, transform: [{ rotate: '-25deg' }] }, horizontalRay: { position: 'absolute', width: 242, height: 2, backgroundColor: '#A8FF00', shadowColor: '#A8FF00', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }, verticalRay: { position: 'absolute', width: 2, height: 242, backgroundColor: '#A8FF00', shadowColor: '#A8FF00', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }, star: { width: 102, height: 102, backgroundColor: '#A8FF00', transform: [{ rotate: '45deg' }], alignItems: 'center', justifyContent: 'center', shadowColor: '#A8FF00', shadowOpacity: 0.85, shadowRadius: 28, shadowOffset: { width: 0, height: 0 }, elevation: 10 }, starCore: { width: 50, height: 50, backgroundColor: '#FFFFFF', opacity: 0.95 }, node: { position: 'absolute', borderRadius: 99, backgroundColor: '#A8FF00', shadowColor: '#A8FF00', shadowOpacity: 0.8, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+});

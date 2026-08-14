@@ -1,98 +1,37 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { NarrialButton } from '@/components/narrial-button';
+import { NeuralOrb } from '@/components/neural-orb';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function WelcomeScreen() {
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.content}>
+        <View style={styles.brand}>
+          <Text accessibilityRole="header" style={styles.wordmark}>NARRIAL</Text>
+          <Text style={styles.subtitle}><Text style={styles.lime}>AI</Text> Content Automation</Text>
+        </View>
+        <View accessible accessibilityLabel="Narrial AI neural intelligence visual" style={styles.visualArea}><NeuralOrb /></View>
+        <View style={styles.footer}>
+          <Text style={styles.tagline}>Let <Text style={styles.lime}>AI</Text> handle your content.{`\n`}You focus on growth.</Text>
+          <View style={styles.actions}>
+            <NarrialButton label="Get Started" onPress={() => router.push('/onboarding')} />
+            <NarrialButton label="Log In" variant="secondary" onPress={() => router.push('/login')} />
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  screen: { flex: 1, backgroundColor: '#000000' },
+  content: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 28, paddingVertical: 20 },
+  brand: { alignItems: 'center' },
+  wordmark: { color: '#FFFFFF', fontSize: 34, fontWeight: '800', letterSpacing: 6 },
+  subtitle: { marginTop: 8, color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.2 },
+  lime: { color: '#A8FF00' }, visualArea: { flex: 1, minHeight: 250, justifyContent: 'center', alignItems: 'center' },
+  footer: { alignItems: 'center' }, tagline: { color: '#FFFFFF', fontSize: 19, fontWeight: '500', lineHeight: 29, textAlign: 'center' }, actions: { width: '100%', marginTop: 30, gap: 14 },
 });
