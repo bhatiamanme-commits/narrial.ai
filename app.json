@@ -9,14 +9,21 @@
     "ios": {
       "icon": "./assets/expo.icon"
     },
-    "android": { "predictiveBackGestureEnabled": false },
-    "web": { "output": "static" },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
-        { "backgroundColor": "#000000" }
-      ]
+        {
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
