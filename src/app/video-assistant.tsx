@@ -31,7 +31,7 @@ const QUESTIONS: Question[] = [
 ];
 
 type Answer = { option?: string; custom?: string; skipped?: boolean };
-type VideoReference = { name: string; source: string; type: 'file' | 'url' };
+type VideoReference = { name: string; source: string; thumbnailSource: string; type: 'file' | 'url' };
 type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: VideoReference };
 type State = { index: number; answers: Record<string, Answer>; complete: boolean; generation: GenerationInput };
 type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'close' };
@@ -72,9 +72,15 @@ function RobotThumbnail() {
 }
 
 function UploadedVideoCard({ reference }: { reference: VideoReference }) {
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+
+  useEffect(() => setThumbnailFailed(false), [reference.thumbnailSource]);
+
   return <View style={styles.uploadWrap}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${reference.name}`} onPress={() => AccessibilityInfo.announceForAccessibility('Video preview opened in demo mode.')} style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]}>
-      <Image source={{ uri: reference.source }} resizeMode="cover" style={styles.videoThumbnail} />
+      {thumbnailFailed
+        ? <RobotThumbnail />
+        : <Image source={{ uri: reference.thumbnailSource }} resizeMode="cover" onError={() => setThumbnailFailed(true)} style={styles.videoThumbnail} />}
       <View style={styles.videoShade} />
       <View style={styles.playButton}><Icon name="play" size={25} /></View>
       <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{reference.name}</Text><Text style={styles.videoDetails}>2:19 · 48 MB</Text></View>
@@ -123,15 +129,15 @@ function QuestionSheet({ state, dispatch, composerRef }: { state: State; dispatc
 }
 
 export default function VideoAssistantScreen() {
-  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceType?: 'file' | 'url'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
+  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
   const composerRef = useRef<TextInput>(null);
   const [percentage, setPercentage] = useState(8);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
-  const reference = params.referenceName && params.referenceSource && (params.referenceType === 'file' || params.referenceType === 'url')
-    ? { name: params.referenceName, source: params.referenceSource, type: params.referenceType }
+  const reference = params.referenceName && params.referenceSource && params.referenceThumbnailSource && (params.referenceType === 'file' || params.referenceType === 'url')
+    ? { name: params.referenceName, source: params.referenceSource, thumbnailSource: params.referenceThumbnailSource, type: params.referenceType }
     : undefined;
   const [state, dispatch] = useReducer(reducer, {
     index: 0,

@@ -1,13 +1,14 @@
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const LIME = '#B6FF2E';
 
 export type VideoReference =
-  | { type: 'file'; source: string; name: string; mimeType?: string; size?: number }
-  | { type: 'url'; source: string; name: string };
+  | { type: 'file'; source: string; thumbnailSource: string; name: string; mimeType?: string; size?: number }
+  | { type: 'url'; source: string; thumbnailSource: string; name: string };
 
 export function isValidVideoUrl(value: string) {
   try {
@@ -50,22 +51,28 @@ export function ReferenceInput({ value, onChange }: { value: VideoReference | nu
       const result = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: true, multiple: false });
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        onChange({ type: 'file', source: asset.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
+        const thumbnail = await VideoThumbnails.getThumbnailAsync(asset.uri);
+        onChange({ type: 'file', source: asset.uri, thumbnailSource: thumbnail.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
       }
     } catch {
-      setPickerError('Unable to open the video picker. Please try again.');
+      setPickerError('Unable to prepare that video preview. Please try again.');
       setSheetVisible(true);
     }
   };
 
-  const addUrl = () => {
+  const addUrl = async () => {
     const normalized = url.trim();
     if (!isValidVideoUrl(normalized)) {
       setError('Enter a valid video URL beginning with http:// or https://.');
       return;
     }
-    onChange({ type: 'url', source: normalized, name: 'Video link added' });
-    setUrlVisible(false);
+    try {
+      const thumbnail = await VideoThumbnails.getThumbnailAsync(normalized);
+      onChange({ type: 'url', source: normalized, thumbnailSource: thumbnail.uri, name: 'Video link added' });
+      setUrlVisible(false);
+    } catch {
+      setError('Unable to create a preview from this video URL. Check the link and try again.');
+    }
   };
 
   return (

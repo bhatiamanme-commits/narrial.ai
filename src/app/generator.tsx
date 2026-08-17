@@ -49,6 +49,7 @@ export default function GeneratorScreen() {
         ...(reference ? {
           referenceName: reference.name,
           referenceSource: reference.source,
+          referenceThumbnailSource: reference.thumbnailSource,
           referenceType: reference.type,
         } : {}),
       },
