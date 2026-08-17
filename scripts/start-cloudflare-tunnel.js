@@ -10,6 +10,7 @@ let cloudflared;
 let expo;
 let stopping = false;
 let tunnelStarted = false;
+let tunnelOutput = "";
 
 function stop(exitCode = 0) {
   if (stopping) return;
@@ -49,8 +50,14 @@ function startExpo(tunnelUrl) {
 function inspectTunnelOutput(chunk) {
   const output = chunk.toString();
   process.stderr.write(output);
-  const match = output.match(tunnelUrlPattern);
-  if (match) startExpo(match[0]);
+  if (tunnelStarted) return;
+
+  tunnelOutput += output;
+  const match = tunnelOutput.match(tunnelUrlPattern);
+  if (match) {
+    tunnelOutput = "";
+    startExpo(match[0]);
+  }
 }
 
 console.log("Starting a temporary Cloudflare tunnel (no account required)...");

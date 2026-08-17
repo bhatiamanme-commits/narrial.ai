@@ -46,7 +46,11 @@ export default function GeneratorScreen() {
         prompt: prompt.trim(),
         videoCount,
         aspectRatio,
-        referenceName: reference?.name ?? 'robot-video.mp4',
+        ...(reference ? {
+          referenceName: reference.name,
+          referenceSource: reference.source,
+          referenceType: reference.type,
+        } : {}),
       },
     });
   };

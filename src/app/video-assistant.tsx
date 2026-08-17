@@ -30,7 +30,9 @@ const QUESTIONS: Question[] = [
 ];
 
 type Answer = { option?: string; custom?: string; skipped?: boolean };
-type State = { index: number; answers: Record<string, Answer>; complete: boolean };
+type VideoReference = { name: string; source: string; type: 'file' | 'url' };
+type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: VideoReference };
+type State = { index: number; answers: Record<string, Answer>; complete: boolean; generation: GenerationInput };
 type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'close' };
 
 function reducer(state: State, action: Action): State {
@@ -120,14 +122,27 @@ function QuestionSheet({ state, dispatch, composerRef }: { state: State; dispatc
 }
 
 export default function VideoAssistantScreen() {
-  const params = useLocalSearchParams<{ referenceName?: string; prompt?: string }>();
+  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceType?: 'file' | 'url'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
   const composerRef = useRef<TextInput>(null);
   const [percentage, setPercentage] = useState(8);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
-  const [state, dispatch] = useReducer(reducer, { index: 0, answers: { format: { option: 'Social reel' } }, complete: false });
+  const reference = params.referenceName && params.referenceSource && (params.referenceType === 'file' || params.referenceType === 'url')
+    ? { name: params.referenceName, source: params.referenceSource, type: params.referenceType }
+    : undefined;
+  const [state, dispatch] = useReducer(reducer, {
+    index: 0,
+    answers: { format: { option: 'Social reel' } },
+    complete: false,
+    generation: {
+      prompt: params.prompt ?? '',
+      videoCount: params.videoCount ?? '3 videos',
+      aspectRatio: params.aspectRatio ?? '9:16',
+      reference,
+    },
+  });
   const fade = useMemo(() => new Animated.Value(1), []);
   const currentQuestion = QUESTIONS[state.index];
   const answer = state.answers[currentQuestion.id] ?? (currentQuestion.defaultOption ? { option: currentQuestion.defaultOption } : {});
@@ -157,31 +172,35 @@ export default function VideoAssistantScreen() {
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
-        <View style={styles.conversation}>
-          <UploadedVideoCard name={params.referenceName || 'robot-video.mp4'} />
-          <AnalysisStatus percentage={percentage} />
-          {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
-        </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
+          <View style={[styles.conversation, compact && styles.conversationCompact]}>
+            {state.generation.reference ? <UploadedVideoCard name={state.generation.reference.name} /> : null}
+            <AnalysisStatus percentage={percentage} />
+            {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
+          </View>
 
-        <View style={styles.dock}>
-          {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
-          <View style={styles.composer}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
-            <TextInput ref={composerRef} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={styles.composerInput} />
-            <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: !details.trim() }} disabled={!details.trim()} onPress={send} style={({ pressed }) => [styles.sendButton, !details.trim() && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
+          <View style={styles.dock}>
+            {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
+            <View style={styles.composer}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
+              <TextInput ref={composerRef} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={styles.composerInput} />
+              <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: !details.trim() }} disabled={!details.trim()} onPress={send} style={({ pressed }) => [styles.sendButton, !details.trim() && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
+            </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000' },
+  scrollContent: { flexGrow: 1 },
   content: { flex: 1, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  contentCompact: { paddingTop: 8, paddingHorizontal: 18 },
+  contentCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingTop: 8, paddingHorizontal: 18 },
   conversation: { flex: 1, minHeight: 155 },
+  conversationCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   uploadWrap: { alignSelf: 'flex-end', width: '52%', maxWidth: 270, minWidth: 190, marginTop: 4, marginRight: 3 },
   uploadCard: { height: 200, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: BORDER, backgroundColor: '#111' },
   robotScene: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111820' },

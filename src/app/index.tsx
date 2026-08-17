@@ -1,8 +1,7 @@
 import { useAuth, useUser } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Image, ImageBackground } from 'expo-image';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -19,22 +18,18 @@ export default function WelcomeScreen() {
   const { isLoaded, isSignedIn, signOut } = useAuth();
   const { user } = useUser();
   const { startHostedAuth } = useHostedAuth();
-  const [pendingMode, setPendingMode] = useState<'sign-in' | 'sign-up' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'google' | 'email' | 'sign-in' | null>(null);
   const compact = height < 760;
 
-  useEffect(() => {
-    if (isLoaded && isSignedIn) router.replace('/generator');
-  }, [isLoaded, isSignedIn]);
-
-  const authenticate = async (mode: 'sign-in' | 'sign-up') => {
-    setPendingMode(mode);
+  const authenticate = async (mode: 'sign-in' | 'sign-up', action: 'google' | 'email' | 'sign-in') => {
+    setPendingAction(action);
     try {
       await startHostedAuth({ mode });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Please try again.';
       Alert.alert('Authentication unavailable', message);
     } finally {
-      setPendingMode(null);
+      setPendingAction(null);
     }
   };
 
@@ -66,13 +61,13 @@ export default function WelcomeScreen() {
               </View>
             ) : (
               <View style={styles.actions}>
-                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign up with Google" onPress={() => authenticate('sign-up')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
-                  <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View>{pendingMode === 'sign-up' ? <ActivityIndicator color="#000000" /> : <Text style={styles.googleText}>Continue with Google</Text>}</View>
+                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign up with Google" onPress={() => authenticate('sign-up', 'google')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View>{pendingAction === 'google' ? <ActivityIndicator color="#000000" /> : <Text style={styles.googleText}>Continue with Google</Text>}</View>
                 </Pressable>
-                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign up with email" onPress={() => authenticate('sign-up')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
-                  <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View><Text style={styles.emailText}>Continue with email</Text></View>
+                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign up with email" onPress={() => authenticate('sign-up', 'email')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View>{pendingAction === 'email' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.emailText}>Continue with email</Text>}</View>
                 </Pressable>
-                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => authenticate('sign-in')} style={({ pressed }) => [styles.signInButton, pressed && styles.pressed]}>
+                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => authenticate('sign-in', 'sign-in')} style={({ pressed }) => [styles.signInButton, pressed && styles.pressed]}>
                   <Text style={styles.signInText}>Already have an account? <Text style={styles.lime}>Sign in</Text></Text>
                 </Pressable>
               </View>
