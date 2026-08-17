@@ -83,7 +83,7 @@ function UploadedVideoCard({ reference }: { reference: VideoReference }) {
         : <Image source={{ uri: reference.thumbnailSource }} resizeMode="cover" onError={() => setThumbnailFailed(true)} style={styles.videoThumbnail} />}
       <View style={styles.videoShade} />
       <View style={styles.playButton}><Icon name="play" size={25} /></View>
-      <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{reference.name}</Text><Text style={styles.videoDetails}>2:19 · 48 MB</Text></View>
+      <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{reference.name}</Text></View>
     </Pressable>
     <View style={styles.delivered}><Icon name="check" color="#000" size={15} /></View>
   </View>;
@@ -179,33 +179,31 @@ export default function VideoAssistantScreen() {
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
+      <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
+        <ScrollView style={styles.conversationScroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
             {state.generation.reference ? <UploadedVideoCard reference={state.generation.reference} /> : null}
             <AnalysisStatus percentage={percentage} />
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
           </View>
-
-          <View style={styles.dock}>
-            {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
-            <View style={styles.composer}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
-              <TextInput ref={composerRef} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={styles.composerInput} />
-              <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: !details.trim() }} disabled={!details.trim()} onPress={send} style={({ pressed }) => [styles.sendButton, !details.trim() && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
-            </View>
-          </View>
+          {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
+        </ScrollView>
+        <View style={styles.composer}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
+          <TextInput ref={composerRef} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={styles.composerInput} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: !details.trim() }} disabled={!details.trim()} onPress={send} style={({ pressed }) => [styles.sendButton, !details.trim() && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { flexGrow: 1 },
+  conversationScroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: 8 },
   content: { flex: 1, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  contentCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingTop: 8, paddingHorizontal: 18 },
+  contentCompact: { paddingTop: 8, paddingHorizontal: 18 },
   conversation: { flex: 1, minHeight: 155 },
   conversationCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   uploadWrap: { alignSelf: 'flex-end', width: '52%', maxWidth: 270, minWidth: 190, marginTop: 4, marginRight: 3 },
@@ -226,7 +224,7 @@ const styles = StyleSheet.create({
   analysisPill: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, paddingHorizontal: 15, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.62)' },
   statusCheck: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: LIME }, analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
   userBubble: { maxWidth: '76%', alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#202020' }, userBubbleText: { color: TEXT, fontSize: 14 },
-  dock: { width: '100%', gap: 8 }, sheet: { maxHeight: 490, minHeight: 410, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.96)' },
+  sheet: { maxHeight: 490, minHeight: 410, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.96)' },
   handle: { width: 42, height: 4, alignSelf: 'center', marginTop: 13, borderRadius: 2, backgroundColor: '#4A4A4A' }, closeButton: { position: 'absolute', zIndex: 2, top: 14, right: 14, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#202020' },
   questionScroll: { paddingHorizontal: 20, paddingTop: 37, paddingBottom: 12 }, step: { color: LIME, fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: .8 }, question: { marginTop: 13, paddingRight: 40, color: TEXT, fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -.5 }, support: { marginTop: 6, color: MUTED, fontSize: 14, lineHeight: 20 }, options: { gap: 9, marginTop: 18 },
   option: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,.28)', backgroundColor: 'rgba(20,20,20,.72)' }, optionSelected: { borderColor: LIME, backgroundColor: 'rgba(168,255,26,.08)' },

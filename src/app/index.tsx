@@ -67,11 +67,11 @@ export default function WelcomeScreen() {
               </View>
             ) : (
               <View style={styles.actions}>
-                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign up with Google" onPress={() => authenticate('sign-up', 'google')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
-                  <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View>{pendingAction === 'google' ? <ActivityIndicator color="#000000" /> : <Text style={styles.googleText}>Continue with Google</Text>}</View>
+                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Open sign-up" onPress={() => authenticate('sign-up', 'google')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View>{pendingAction === 'google' ? <ActivityIndicator color="#000000" /> : <Text style={styles.googleText}>Create an account</Text>}</View>
                 </Pressable>
-                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign up with email" onPress={() => authenticate('sign-up', 'email')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
-                  <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View>{pendingAction === 'email' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.emailText}>Continue with email</Text>}</View>
+                <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Open sign-up" onPress={() => authenticate('sign-up', 'email')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View>{pendingAction === 'email' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.emailText}>Sign up securely</Text>}</View>
                 </Pressable>
                 <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => authenticate('sign-in', 'sign-in')} style={({ pressed }) => [styles.signInButton, pressed && styles.pressed]}>
                   {pendingAction === 'sign-in' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.signInText}>Already have an account? <Text style={styles.lime}>Sign in</Text></Text>}

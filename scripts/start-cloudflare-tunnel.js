@@ -2,7 +2,11 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 
 const projectRoot = path.resolve(__dirname, "..");
-const cloudflaredPath = path.join(projectRoot, ".tools", "cloudflared.exe");
+const cloudflaredPath =
+  process.env.CLOUDFLARED_PATH ??
+  (process.platform === "win32"
+    ? path.join(projectRoot, ".tools", "cloudflared.exe")
+    : "cloudflared");
 const expoCliPath = path.join(projectRoot, "node_modules", "expo", "bin", "cli");
 const tunnelUrlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
 
