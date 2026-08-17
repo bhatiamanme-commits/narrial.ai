@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NarrialButton } from '@/components/narrial-button';
 
 export default function LoginScreen() {
-  return <SafeAreaView style={styles.screen}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>Welcome back.</Text><Text style={styles.copy}>Login will connect to Narrial&apos;s authentication service when it is available.</Text><NarrialButton label="Back to welcome" variant="secondary" onPress={() => router.back()} /></View></SafeAreaView>;
+  return <SafeAreaView style={styles.screen}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>Welcome back.</Text><Text style={styles.copy}>Login will connect to Narrial&apos;s authentication service when it is available.</Text><NarrialButton label="Back to welcome" variant="secondary" onPress={() => router.replace('/')} /></View></SafeAreaView>;
 }
 
 const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: '#000', justifyContent: 'center', padding: 28 }, content: { width: '100%', maxWidth: 500, alignSelf: 'center', gap: 22 }, title: { color: '#fff', fontSize: 32, lineHeight: 40, fontWeight: '800' }, copy: { color: '#A3A3A3', fontSize: 17, lineHeight: 25 } });

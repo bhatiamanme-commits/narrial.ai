@@ -5,6 +5,8 @@ node_modules/
 
 # Expo
 .expo/
+.tools/
+.wrangler-config/
 dist/
 web-build/
 expo-env.d.ts

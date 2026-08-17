@@ -1,0 +1,41 @@
+
+> narrial@1.0.0 web
+> expo start --web --clear
+
+env: load .env.local
+env: export CLERK_SECRET_KEY EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
+Starting project at C:\Users\hello\OneDrive\Desktop\narrial.ai\narrial
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+Using src/app as the root directory for Expo Router.
+React Compiler enabled
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+Waiting on http://localhost:8081
+
+Logs for your project will appear below.
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+| ✅ Clerk iOS plugin loaded
+| ✅ Clerk Android plugin loaded
+λ Bundled 13361ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1098 modules)
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+Web Bundled 14414ms node_modules\expo-router\entry.js (1075 modules)

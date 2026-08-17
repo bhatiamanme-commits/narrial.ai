@@ -1,6 +1,9 @@
+import { useAuth, useUser } from '@clerk/expo';
+import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Image, ImageBackground } from 'expo-image';
 import { router } from 'expo-router';
-import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
@@ -13,7 +16,27 @@ const googleLogo = svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 
 export default function WelcomeScreen() {
   const { height } = useWindowDimensions();
+  const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+  const { startHostedAuth } = useHostedAuth();
+  const [pendingMode, setPendingMode] = useState<'sign-in' | 'sign-up' | null>(null);
   const compact = height < 760;
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) router.replace('/generator');
+  }, [isLoaded, isSignedIn]);
+
+  const authenticate = async (mode: 'sign-in' | 'sign-up') => {
+    setPendingMode(mode);
+    try {
+      await startHostedAuth({ mode });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      Alert.alert('Authentication unavailable', message);
+    } finally {
+      setPendingMode(null);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -28,14 +51,32 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.bottom}>
-            <View style={styles.actions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" onPress={() => router.push('/signup')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
-                <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View><Text style={styles.googleText}>Continue with Google</Text></View>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Continue with email" onPress={() => router.push('/signup')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
-                <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View><Text style={styles.emailText}>Continue with email</Text></View>
-              </Pressable>
-            </View>
+            {!isLoaded ? (
+              <ActivityIndicator accessibilityLabel="Loading authentication" color={lime} size="large" />
+            ) : isSignedIn ? (
+              <View style={styles.signedInCard}>
+                {user?.imageUrl ? <Image source={user.imageUrl} style={styles.avatar} accessibilityLabel="Profile picture" /> : null}
+                <View style={styles.accountCopy}>
+                  <Text style={styles.accountLabel}>Signed in</Text>
+                  <Text numberOfLines={1} style={styles.accountName}>{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Your account'}</Text>
+                </View>
+                <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={() => signOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
+                  <Text style={styles.signOutText}>Sign out</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.actions}>
+                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign up with Google" onPress={() => authenticate('sign-up')} style={({ pressed }) => [styles.button, styles.googleButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.googleLogo}><SvgXml xml={googleLogo} width="100%" height="100%" /></View>{pendingMode === 'sign-up' ? <ActivityIndicator color="#000000" /> : <Text style={styles.googleText}>Continue with Google</Text>}</View>
+                </Pressable>
+                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign up with email" onPress={() => authenticate('sign-up')} style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}>
+                  <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View><Text style={styles.emailText}>Continue with email</Text></View>
+                </Pressable>
+                <Pressable disabled={pendingMode !== null} accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => authenticate('sign-in')} style={({ pressed }) => [styles.signInButton, pressed && styles.pressed]}>
+                  <Text style={styles.signInText}>Already have an account? <Text style={styles.lime}>Sign in</Text></Text>
+                </Pressable>
+              </View>
+            )}
 
             <Text style={styles.legal}>By continuing, you agree to Narrial&apos;s <Text accessibilityRole="link" onPress={() => Linking.openURL('https://narrial.ai/terms')} style={styles.legalLink}>Terms of Service</Text>.{`\n`}Read our <Text accessibilityRole="link" onPress={() => Linking.openURL('https://narrial.ai/privacy')} style={styles.legalLink}>Privacy Policy</Text>.</Text>
           </View>
@@ -62,5 +103,9 @@ const styles = StyleSheet.create({
   buttonContent: { width: 272, flexDirection: 'row', alignItems: 'center' }, googleLogo: { width: 29, height: 29, marginRight: 24 }, emailIcon: { width: 29, marginRight: 24 },
   googleText: { color: '#000000', fontSize: 18, lineHeight: 24, fontWeight: '700' }, emailText: { color: '#FFFFFF', fontSize: 18, lineHeight: 24, fontWeight: '700' },
   legal: { marginTop: 30, color: '#FFFFFF', fontSize: 13, lineHeight: 21, textAlign: 'center' }, legalLink: { color: lime, textDecorationLine: 'underline' },
+  signInButton: { alignItems: 'center', paddingVertical: 8 }, signInText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  signedInCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 24, backgroundColor: 'rgba(20,20,20,0.94)', borderWidth: 1, borderColor: '#343434' },
+  avatar: { width: 48, height: 48, borderRadius: 24 }, accountCopy: { flex: 1 }, accountLabel: { color: lime, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 }, accountName: { marginTop: 3, color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  signOutButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#2A2A2A' }, signOutText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });
