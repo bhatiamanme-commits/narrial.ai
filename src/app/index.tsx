@@ -1,6 +1,7 @@
 import { useAuth, useUser } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Image, ImageBackground } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,9 +56,14 @@ export default function WelcomeScreen() {
                   <Text style={styles.accountLabel}>Signed in</Text>
                   <Text numberOfLines={1} style={styles.accountName}>{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Your account'}</Text>
                 </View>
-                <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={() => signOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
-                  <Text style={styles.signOutText}>Sign out</Text>
-                </Pressable>
+                <View style={styles.accountActions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Continue to video generator" onPress={() => router.replace('/generator')} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
+                    <Text style={styles.continueText}>Continue</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={() => signOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
+                    <Text style={styles.signOutText}>Sign out</Text>
+                  </Pressable>
+                </View>
               </View>
             ) : (
               <View style={styles.actions}>
@@ -68,7 +74,7 @@ export default function WelcomeScreen() {
                   <View style={styles.buttonContent}><View style={styles.emailIcon}><AuthIcon name="mail" size={27} color="#FFFFFF" /></View>{pendingAction === 'email' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.emailText}>Continue with email</Text>}</View>
                 </Pressable>
                 <Pressable disabled={pendingAction !== null} accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => authenticate('sign-in', 'sign-in')} style={({ pressed }) => [styles.signInButton, pressed && styles.pressed]}>
-                  <Text style={styles.signInText}>Already have an account? <Text style={styles.lime}>Sign in</Text></Text>
+                  {pendingAction === 'sign-in' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.signInText}>Already have an account? <Text style={styles.lime}>Sign in</Text></Text>}
                 </Pressable>
               </View>
             )}
@@ -101,6 +107,7 @@ const styles = StyleSheet.create({
   signInButton: { alignItems: 'center', paddingVertical: 8 }, signInText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   signedInCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 24, backgroundColor: 'rgba(20,20,20,0.94)', borderWidth: 1, borderColor: '#343434' },
   avatar: { width: 48, height: 48, borderRadius: 24 }, accountCopy: { flex: 1 }, accountLabel: { color: lime, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 }, accountName: { marginTop: 3, color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  accountActions: { gap: 6 }, continueButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: lime }, continueText: { color: '#000000', fontSize: 13, fontWeight: '800' },
   signOutButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#2A2A2A' }, signOutText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

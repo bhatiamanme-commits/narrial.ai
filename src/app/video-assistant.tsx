@@ -3,6 +3,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -70,13 +71,13 @@ function RobotThumbnail() {
   </View>;
 }
 
-function UploadedVideoCard({ name }: { name: string }) {
+function UploadedVideoCard({ reference }: { reference: VideoReference }) {
   return <View style={styles.uploadWrap}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${name}`} onPress={() => AccessibilityInfo.announceForAccessibility('Video preview opened in demo mode.')} style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]}>
-      <RobotThumbnail />
+    <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${reference.name}`} onPress={() => AccessibilityInfo.announceForAccessibility('Video preview opened in demo mode.')} style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]}>
+      <Image source={{ uri: reference.source }} resizeMode="cover" style={styles.videoThumbnail} />
       <View style={styles.videoShade} />
       <View style={styles.playButton}><Icon name="play" size={25} /></View>
-      <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{name}</Text><Text style={styles.videoDetails}>2:19 · 48 MB</Text></View>
+      <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{reference.name}</Text><Text style={styles.videoDetails}>2:19 · 48 MB</Text></View>
     </Pressable>
     <View style={styles.delivered}><Icon name="check" color="#000" size={15} /></View>
   </View>;
@@ -175,7 +176,7 @@ export default function VideoAssistantScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
-            {state.generation.reference ? <UploadedVideoCard name={state.generation.reference.name} /> : null}
+            {state.generation.reference ? <UploadedVideoCard reference={state.generation.reference} /> : null}
             <AnalysisStatus percentage={percentage} />
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
           </View>
@@ -203,6 +204,7 @@ const styles = StyleSheet.create({
   conversationCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   uploadWrap: { alignSelf: 'flex-end', width: '52%', maxWidth: 270, minWidth: 190, marginTop: 4, marginRight: 3 },
   uploadCard: { height: 200, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: BORDER, backgroundColor: '#111' },
+  videoThumbnail: { width: '100%', height: '100%' },
   robotScene: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111820' },
   robotAntenna: { position: 'absolute', top: 19, width: 5, height: 27, borderRadius: 3, backgroundColor: '#9EA9B2' },
   robotHead: { position: 'absolute', top: 37, width: 112, height: 82, alignItems: 'center', justifyContent: 'center', borderRadius: 37, borderWidth: 6, borderColor: '#AEB8BF', backgroundColor: '#525E67' },

@@ -5,12 +5,12 @@ export function redirectSystemPath({ path }: NativeIntent) {
     const url = new URL(path, 'narrial://app');
     const marker = '/--/';
 
-    if (url.pathname === '/--') return '/';
+    if (url.pathname === '/--') return `/${url.search}${url.hash}`;
     if (url.pathname.startsWith(marker)) {
       return `/${url.pathname.slice(marker.length)}${url.search}${url.hash}`;
     }
   } catch {
-    return path;
+    return '/';
   }
 
   return path;
