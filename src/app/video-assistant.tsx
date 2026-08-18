@@ -130,7 +130,7 @@ function OptionRow({ index, label, selected, onPress }: { index: number; label: 
   </Pressable>;
 }
 
-function QuestionSheet({ state, dispatch, composerRef }: { state: State; dispatch: React.Dispatch<Action>; composerRef: React.RefObject<TextInput | null> }) {
+function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: State; dispatch: React.Dispatch<Action>; composerRef: React.RefObject<TextInput | null>; onAdvance: (action: 'next' | 'skip') => void }) {
   const question = QUESTIONS[state.index];
   const answer = state.answers[question.id] ?? (question.defaultOption ? { option: question.defaultOption } : {});
   const isCustom = answer.option === question.customOption;
@@ -147,8 +147,8 @@ function QuestionSheet({ state, dispatch, composerRef }: { state: State; dispatc
       </View>
     </ScrollView>
     <View style={styles.footer}>
-      <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'skip' })} style={styles.skipButton}><Text style={styles.skipText}>Skip</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{ disabled: !valid }} disabled={!valid} onPress={() => dispatch({ type: 'next' })} style={({ pressed }) => [styles.nextButton, !valid && styles.disabled, pressed && styles.pressed]}><Text style={styles.nextText}>{state.index === QUESTIONS.length - 1 ? 'Finish' : 'Next'}</Text><Icon name="arrow" color="#000" size={23} /></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => onAdvance('skip')} style={styles.skipButton}><Text style={styles.skipText}>Skip</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: !valid }} disabled={!valid} onPress={() => onAdvance('next')} style={({ pressed }) => [styles.nextButton, !valid && styles.disabled, pressed && styles.pressed]}><Text style={styles.nextText}>{state.index === QUESTIONS.length - 1 ? 'Finish' : 'Next'}</Text><Icon name="arrow" color="#000" size={23} /></Pressable>
     </View>
   </View>;
 }
@@ -208,6 +208,11 @@ export default function VideoAssistantScreen() {
     setSentDetails(items => [...items, details.trim()]);
     setDetails('');
   };
+  const advanceQuestion = (action: 'next' | 'skip') => {
+    if (action === 'next' && customActive) dispatch({ type: 'custom', value: details });
+    dispatch({ type: action });
+    setDetails('');
+  };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -221,7 +226,7 @@ export default function VideoAssistantScreen() {
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {state.complete ? <View style={styles.completionBubble}><View style={styles.completionCheck}><Icon name="check" color="#000" size={17} /></View><Text style={styles.completionText}>there is the video based on the all reference</Text></View> : null}
           </View>
-          {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
+          {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} onAdvance={advanceQuestion} /></Animated.View> : null}
         </ScrollView>
         <View style={styles.composer}>
           <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>

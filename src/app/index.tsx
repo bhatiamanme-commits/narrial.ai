@@ -57,7 +57,7 @@ export default function WelcomeScreen() {
                   <Text numberOfLines={1} style={styles.accountName}>{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Your account'}</Text>
                 </View>
                 <View style={styles.accountActions}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Continue to video generator" onPress={() => router.replace('/generator')} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Continue to video generator" onPress={() => router.replace('/onboarding')} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
                     <Text style={styles.continueText}>Continue</Text>
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={() => signOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>

@@ -30,7 +30,7 @@ export default function GeneratedVideoScreen() {
         />
       </View>
       <View style={[styles.actionRow, { bottom: Math.max(36, height * 0.055), height: Math.min(88, height * 0.095) }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Regenerate video" onPress={() => player.replay()} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Replay video" onPress={() => player.replay()} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
           <GlassView colorScheme="dark" glassEffectStyle="clear" isInteractive pointerEvents="none" style={styles.glassSurface} tintColor="rgba(255,255,255,0.06)">
             <View pointerEvents="none" style={styles.glassHighlight} />
             <SvgXml xml={regenerateIcon} width={31} height={31} />

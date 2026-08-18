@@ -32,8 +32,12 @@ export default function ConnectSocialAccountsPage() {
     setConnectingId(platform.id);
     setMessage(`Connecting ${platform.name}.`);
     try {
-      await connectSocialAccount(platform.id);
-      setPlatforms((current) => current.map((item) => item.id === platform.id ? { ...item, connected: true } : item));
+      const connection = await connectSocialAccount(platform.id);
+      if (!connection.connected || !connection.verified) {
+        setMessage(`${platform.name} connection is not available yet.`);
+        return;
+      }
+      setPlatforms((current) => current.map((item) => item.id === platform.id ? { ...item, connected: connection.connected, verified: connection.verified } : item));
       setMessage(`${platform.name} connected successfully.`);
     } catch {
       setMessage(`Could not connect ${platform.name}. Please try again.`);
@@ -46,13 +50,13 @@ export default function ConnectSocialAccountsPage() {
     setMenuOpen(false);
     Alert.alert('Disconnect all accounts?', 'You will need to reconnect an account before publishing.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Disconnect all', style: 'destructive', onPress: () => { setPlatforms((current) => current.map((item) => ({ ...item, connected: false }))); setMessage('All social accounts disconnected.'); } },
+      { text: 'Disconnect all', style: 'destructive', onPress: () => { setPlatforms((current) => current.map((item) => ({ ...item, connected: false, verified: false }))); setMessage('All social accounts disconnected.'); } },
     ]);
   };
 
   const handleContinue = async () => {
     if (continuing) return;
-    if (!platforms.some((platform) => platform.connected)) {
+    if (!platforms.some((platform) => platform.connected && platform.verified)) {
       setMessage('Connect at least one social account to continue.');
       return;
     }
