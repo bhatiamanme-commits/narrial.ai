@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -16,11 +16,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
 const MUTED = '#929692';
 const BORDER = 'rgba(255,255,255,0.18)';
+const GENERATED_VIDEO = require('../../assets/videos/chihuahua-bully-crocodile.mp4');
 
 type Question = { id: string; title: string; support: string; options: string[]; customOption?: string; defaultOption?: string };
 const QUESTIONS: Question[] = [
@@ -97,6 +99,29 @@ function AnalysisStatus({ percentage }: { percentage: number }) {
   </View>;
 }
 
+function GeneratedVideoCard() {
+  const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+    instance.play();
+  });
+
+  return <Pressable
+    accessibilityRole="button"
+    accessibilityLabel="Open generated video full screen with sound"
+    onPress={() => router.push('/generated-video')}
+    style={({ pressed }) => [styles.generatedVideoWrap, pressed && styles.pressed]}
+  >
+    <VideoView
+      accessibilityLabel="Generated video showing a Chihuahua and bully dog with a crocodile toy"
+      contentFit="cover"
+      nativeControls={false}
+      player={player}
+      style={styles.generatedVideo}
+    />
+  </Pressable>;
+}
+
 function OptionRow({ index, label, selected, onPress }: { index: number; label: string; selected: boolean; onPress: () => void }) {
   return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} accessibilityLabel={`${label}, option ${index}`} onPress={onPress} style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}>
     <View style={[styles.numberBadge, selected && styles.numberSelected]}><Text style={[styles.numberText, selected && styles.numberTextSelected]}>{index}</Text></View>
@@ -154,6 +179,13 @@ export default function VideoAssistantScreen() {
   const currentQuestion = QUESTIONS[state.index];
   const answer = state.answers[currentQuestion.id] ?? (currentQuestion.defaultOption ? { option: currentQuestion.defaultOption } : {});
   const customActive = answer.option === currentQuestion.customOption;
+  const answerMessages = QUESTIONS.flatMap((question, index) => {
+    if (index >= state.index && !state.complete) return [];
+    const savedAnswer = state.answers[question.id];
+    if (!savedAnswer) return [];
+    if (savedAnswer.skipped) return [`Skipped: ${question.title}`];
+    return [savedAnswer.custom?.trim() || savedAnswer.option].filter((value): value is string => Boolean(value));
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setPercentage(value => value >= 100 ? 100 : Math.min(100, value + 23)), 420);
@@ -184,7 +216,10 @@ export default function VideoAssistantScreen() {
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
             {state.generation.reference ? <UploadedVideoCard reference={state.generation.reference} /> : null}
             <AnalysisStatus percentage={percentage} />
+            {percentage >= 100 ? <GeneratedVideoCard /> : null}
+            {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
+            {state.complete ? <View style={styles.completionBubble}><View style={styles.completionCheck}><Icon name="check" color="#000" size={17} /></View><Text style={styles.completionText}>there is the video based on the all reference</Text></View> : null}
           </View>
           {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} /></Animated.View> : null}
         </ScrollView>
@@ -223,7 +258,12 @@ const styles = StyleSheet.create({
   delivered: { position: 'absolute', right: -5, bottom: -9, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 3, borderColor: '#000', backgroundColor: LIME },
   analysisPill: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, paddingHorizontal: 15, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.62)' },
   statusCheck: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: LIME }, analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
+  generatedVideoWrap: { width: '58%', minWidth: 210, maxWidth: 310, aspectRatio: 9 / 14, marginTop: 18, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: BORDER, backgroundColor: '#0B0B0B' },
+  generatedVideo: { width: '100%', height: '100%' },
   userBubble: { maxWidth: '76%', alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#202020' }, userBubbleText: { color: TEXT, fontSize: 14 },
+  completionBubble: { maxWidth: '82%', minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 28, borderWidth: 1, borderColor: BORDER },
+  completionCheck: { width: 30, height: 30, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: LIME },
+  completionText: { flex: 1, color: TEXT, fontSize: 15, lineHeight: 21 },
   sheet: { maxHeight: 490, minHeight: 410, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.96)' },
   handle: { width: 42, height: 4, alignSelf: 'center', marginTop: 13, borderRadius: 2, backgroundColor: '#4A4A4A' }, closeButton: { position: 'absolute', zIndex: 2, top: 14, right: 14, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#202020' },
   questionScroll: { paddingHorizontal: 20, paddingTop: 37, paddingBottom: 12 }, step: { color: LIME, fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: .8 }, question: { marginTop: 13, paddingRight: 40, color: TEXT, fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -.5 }, support: { marginTop: 6, color: MUTED, fontSize: 14, lineHeight: 20 }, options: { gap: 9, marginTop: 18 },

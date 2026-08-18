@@ -25,7 +25,8 @@
       ],
       "expo-image",
       "expo-secure-store",
-      "@clerk/expo"
+      "@clerk/expo",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
