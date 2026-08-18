@@ -5,6 +5,7 @@ import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensio
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
+import { BottomActionBar } from '@/components/bottom-action-bar';
 import { ReferenceInput, VideoReference } from '@/components/reference-input';
 
 const LIME = '#9DFF00';
@@ -60,6 +61,8 @@ export default function GeneratorScreen() {
     if (router.canGoBack()) router.back();
   };
 
+  const openSocialConnections = () => router.push('/onboarding');
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={[styles.content, compact && styles.contentCompact]}>
@@ -69,7 +72,7 @@ export default function GeneratorScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Generation history" onPress={() => Alert.alert('Generation history', 'Your generated videos will appear here.')} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="history" size={compact ? 22 : 25} /></Pressable>
         </View>
 
-        <View style={[styles.header, compact && styles.headerCompact]}><Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}><Text style={styles.titleLight}>Video</Text>{'\n'}Generator</Text><Text style={[styles.subtitle, compact && styles.subtitleCompact]}>Generate multiple AI videos from one powerful prompt.</Text></View>
+        <View style={[styles.header, compact && styles.headerCompact]}><Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}><Text style={styles.titleLight}>Video</Text>{'\n'}Generator</Text></View>
 
         <View style={[styles.promptCard, compact && styles.promptCardCompact]}>
           <Text style={styles.label}>Prompt</Text>
@@ -83,6 +86,11 @@ export default function GeneratorScreen() {
         </View>
 
         <Pressable accessibilityRole="button" accessibilityLabel="Generate videos" onPress={generate} style={({ pressed }) => [styles.generateButton, compact && styles.generateButtonCompact, pressed && styles.pressed]}><Text style={styles.generateText}>Generate Videos</Text><Icon name="arrow" color="#000000" size={28} /></Pressable>
+        <BottomActionBar
+          onOpenSocialConnections={openSocialConnections}
+          onOpenPublishing={() => Alert.alert('Publishing', 'Your published and scheduled posts will appear here.')}
+          onOpenAiInsights={() => Alert.alert('AI learning insights', 'See how Narrial learns from your content here.')}
+        />
       </View>
       <ChoiceModal title="How many videos?" choices={['1 video', '3 videos', '5 videos', '10 videos']} visible={openPicker === 'count'} onClose={() => setOpenPicker(null)} onChoose={(choice) => { setVideoCount(choice); setOpenPicker(null); }} />
       <ChoiceModal title="Aspect ratio" choices={['9:16', '1:1', '16:9']} visible={openPicker === 'ratio'} onClose={() => setOpenPicker(null)} onChoose={(choice) => { setAspectRatio(choice); setOpenPicker(null); }} />
@@ -91,7 +99,7 @@ export default function GeneratorScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000000' }, content: { flex: 1, width: '100%', maxWidth: 620, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 14, paddingBottom: 20 }, contentCompact: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 10 },
+  screen: { flex: 1, backgroundColor: '#000000' }, content: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20 }, contentCompact: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 10 },
   topBar: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, topBarCompact: { minHeight: 42 }, circleButton: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' }, circleButtonCompact: { width: 42, height: 42, borderRadius: 21 },
   profile: { flex: 1, maxWidth: 280, height: 44, flexDirection: 'row', alignItems: 'center', gap: 9, paddingRight: 13, borderRadius: 22, borderWidth: 1, borderColor: '#282828', backgroundColor: '#090909' }, profileCompact: { height: 38, borderRadius: 19 }, avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616', borderWidth: 1, borderColor: LIME }, avatarCompact: { width: 36, height: 36, borderRadius: 18 }, avatarText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' }, profileEmail: { flex: 1, color: '#B8B8B8', fontSize: 12, fontWeight: '600' },
   header: { marginTop: 28, marginBottom: 18 }, headerCompact: { marginTop: 12, marginBottom: 10 }, title: { color: '#FFFFFF', fontSize: 44, lineHeight: 45, fontWeight: '900', letterSpacing: -1.4 }, titleCompact: { fontSize: 32, lineHeight: 32, letterSpacing: -0.9 }, titleLight: { fontWeight: '300' }, subtitle: { maxWidth: 430, marginTop: 14, color: '#999999', fontSize: 18, lineHeight: 25 }, subtitleCompact: { marginTop: 7, fontSize: 14, lineHeight: 18 },

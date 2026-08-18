@@ -5,7 +5,7 @@ import type { SocialPlatform } from './social-accounts';
 
 const LIME = '#A8FF00';
 
-function PlatformIcon({ id, name }: Pick<SocialPlatform, 'id' | 'name'>) {
+export function PlatformIcon({ id, name }: Pick<SocialPlatform, 'id' | 'name'>) {
   const icon = (() => {
     switch (id) {
       case 'instagram':

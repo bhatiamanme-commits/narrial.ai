@@ -2,8 +2,11 @@ import { StatusBar } from 'expo-status-bar';
 import { GlassView } from 'expo-glass-effect';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+
+import { getConnectedSocialAccounts } from '@/features/social-accounts/social-accounts';
 
 const GENERATED_VIDEO = require('../../assets/videos/chihuahua-bully-crocodile.mp4');
 const arrowIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 7l5 5-5 5"/></svg>';
@@ -11,11 +14,24 @@ const regenerateIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 
 
 export default function GeneratedVideoScreen() {
   const { height } = useWindowDimensions();
+  const [checkingAccounts, setCheckingAccounts] = useState(false);
   const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
     instance.loop = true;
     instance.muted = false;
     instance.play();
   });
+
+  const continueToPublishing = async () => {
+    if (checkingAccounts) return;
+    setCheckingAccounts(true);
+    try {
+      const accounts = await getConnectedSocialAccounts();
+      const hasValidAccount = accounts.some((account) => account.connectionStatus === 'connected' && account.tokenStatus === 'valid');
+      router.push(hasValidAccount ? '/choose-accounts' : { pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
+    } catch {
+      Alert.alert('Couldn’t check accounts', 'Check your internet connection and try again.');
+    } finally { setCheckingAccounts(false); }
+  };
 
   return (
     <View style={styles.screen}>
@@ -36,10 +52,10 @@ export default function GeneratedVideoScreen() {
             <SvgXml xml={regenerateIcon} width={31} height={31} />
           </GlassView>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Connect social accounts" onPress={() => router.push('/onboarding')} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Continue to choose publishing accounts" accessibilityState={{ busy: checkingAccounts, disabled: checkingAccounts }} disabled={checkingAccounts} onPress={continueToPublishing} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
           <GlassView colorScheme="dark" glassEffectStyle="clear" isInteractive pointerEvents="none" style={styles.glassSurface} tintColor="rgba(255,255,255,0.06)">
             <View pointerEvents="none" style={styles.glassHighlight} />
-            <SvgXml xml={arrowIcon} width={34} height={34} />
+            {checkingAccounts ? <ActivityIndicator accessibilityLabel="Checking connected accounts" color="#FFFFFF"/> : <SvgXml xml={arrowIcon} width={34} height={34} />}
           </GlassView>
         </Pressable>
       </View>
