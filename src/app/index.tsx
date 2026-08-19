@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
 import { AuthIcon } from '@/components/auth-components';
+import { clearSocialAccountState } from '@/features/social-accounts/social-accounts';
 
 const lime = '#9DFF00';
 const svgUri = (svg: string) => svg;
@@ -21,6 +22,12 @@ export default function WelcomeScreen() {
   const { startHostedAuth } = useHostedAuth();
   const [pendingAction, setPendingAction] = useState<'google' | 'email' | 'sign-in' | null>(null);
   const compact = height < 760;
+
+  const handleSignOut = async () => {
+    const signedOutUserId = user?.id;
+    await signOut();
+    if (signedOutUserId) clearSocialAccountState(signedOutUserId);
+  };
 
   const authenticate = async (mode: 'sign-in' | 'sign-up', action: 'google' | 'email' | 'sign-in') => {
     setPendingAction(action);
@@ -57,10 +64,10 @@ export default function WelcomeScreen() {
                   <Text numberOfLines={1} style={styles.accountName}>{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Your account'}</Text>
                 </View>
                 <View style={styles.accountActions}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Continue to video generator" onPress={() => router.replace('/onboarding')} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Continue to account setup" onPress={() => router.replace('/onboarding')} style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
                     <Text style={styles.continueText}>Continue</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={() => signOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Sign out" onPress={handleSignOut} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
                     <Text style={styles.signOutText}>Sign out</Text>
                   </Pressable>
                 </View>

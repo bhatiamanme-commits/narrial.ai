@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/expo';
 import { StatusBar } from 'expo-status-bar';
 import { GlassView } from 'expo-glass-effect';
 import { router } from 'expo-router';
@@ -6,13 +7,14 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
-import { getConnectedSocialAccounts } from '@/features/social-accounts/social-accounts';
+import { getConnectedSocialAccounts, isSocialAccountValid } from '@/features/social-accounts/social-accounts';
 
 const GENERATED_VIDEO = require('../../assets/videos/chihuahua-bully-crocodile.mp4');
 const arrowIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 7l5 5-5 5"/></svg>';
 const regenerateIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg>';
 
 export default function GeneratedVideoScreen() {
+  const { user } = useUser();
   const { height } = useWindowDimensions();
   const [checkingAccounts, setCheckingAccounts] = useState(false);
   const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
@@ -23,10 +25,11 @@ export default function GeneratedVideoScreen() {
 
   const continueToPublishing = async () => {
     if (checkingAccounts) return;
+    if (!user?.id) { Alert.alert('Sign in required', 'Sign in before choosing publishing accounts.'); return; }
     setCheckingAccounts(true);
     try {
-      const accounts = await getConnectedSocialAccounts();
-      const hasValidAccount = accounts.some((account) => account.connectionStatus === 'connected' && account.tokenStatus === 'valid');
+      const accounts = await getConnectedSocialAccounts(user.id);
+      const hasValidAccount = accounts.some(isSocialAccountValid);
       router.push(hasValidAccount ? '/choose-accounts' : { pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
     } catch {
       Alert.alert('Couldn’t check accounts', 'Check your internet connection and try again.');

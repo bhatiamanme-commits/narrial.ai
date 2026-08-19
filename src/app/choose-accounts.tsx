@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/expo';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -5,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { ChooseAccountCard } from '@/features/social-accounts/choose-account-card';
-import { getConnectedSocialAccounts, getSavedPublishingTargets, savePublishingTargets, type SocialAccount } from '@/features/social-accounts/social-accounts';
+import { getConnectedSocialAccounts, getSavedPublishingTargets, isSocialAccountValid, savePublishingTargets, type SocialAccount } from '@/features/social-accounts/social-accounts';
 
 const LIME = '#A8FF00';
 const NEXT_PUBLISHING_ROUTE = '/generator' as const;
@@ -21,6 +22,7 @@ function AccountListSkeleton() {
 }
 
 export default function ChooseAccountsPage() {
+  const { user } = useUser();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,15 +33,16 @@ export default function ChooseAccountsPage() {
 
   const loadAccounts = useCallback(async () => {
     setLoading(true); setError(''); setMessage('Checking connected accounts…');
+    if (!user?.id) { router.replace('/'); setLoading(false); return; }
     try {
-      const nextAccounts = await getConnectedSocialAccounts();
-      const validAccounts = nextAccounts.filter((account) => account.connectionStatus === 'connected' && account.tokenStatus === 'valid');
+      const nextAccounts = await getConnectedSocialAccounts(user.id);
+      const validAccounts = nextAccounts.filter(isSocialAccountValid);
       if (validAccounts.length === 0) {
         router.replace({ pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
         return;
       }
       const validIds = new Set(validAccounts.map((account) => account.id));
-      const saved = getSavedPublishingTargets().filter((id) => validIds.has(id));
+      const saved = getSavedPublishingTargets(user.id).filter((id) => validIds.has(id));
       setAccounts(nextAccounts);
       setSelectedIds(saved.length ? saved : [validAccounts[0].id]);
       setMessage(`${nextAccounts.length} connected ${nextAccounts.length === 1 ? 'account' : 'accounts'} available.`);
@@ -47,12 +50,12 @@ export default function ChooseAccountsPage() {
       setError('We couldn’t load your accounts. Check your internet connection and try again.');
       setMessage('Connected accounts could not be loaded.');
     } finally { setLoading(false); }
-  }, []);
+  }, [user?.id]);
 
   useFocusEffect(useCallback(() => { void loadAccounts(); }, [loadAccounts]));
 
   const toggleAccount = (account: SocialAccount) => {
-    if (account.connectionStatus !== 'connected' || account.tokenStatus !== 'valid') {
+    if (!isSocialAccountValid(account)) {
       router.push({ pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
       return;
     }
@@ -64,10 +67,10 @@ export default function ChooseAccountsPage() {
   };
 
   const handleNext = async () => {
-    if (!selectedIds.length || submitting) return;
+    if (!selectedIds.length || submitting || !user?.id) return;
     setSubmitting(true); setError(''); setMessage('Saving selected accounts.');
     try {
-      await savePublishingTargets(selectedIds);
+      await savePublishingTargets(user.id, selectedIds);
       router.push(NEXT_PUBLISHING_ROUTE);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Your account selection could not be saved. Please try again.');

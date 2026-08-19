@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/expo';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -5,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { SocialAccountCard } from '@/features/social-accounts/social-account-card';
-import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
+import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, isSocialAccountValid, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
 
 const LIME = '#A8FF00';
 
@@ -20,6 +21,7 @@ function CircularIconButton({ label, icon, onPress, expanded }: CircularIconButt
 }
 
 export default function ConnectSocialAccountsPage() {
+  const { user } = useUser();
   const { height, width } = useWindowDimensions();
   const compact = height < 780 || width < 360;
   const [platforms, setPlatforms] = useState(INITIAL_SOCIAL_PLATFORMS);
@@ -29,18 +31,20 @@ export default function ConnectSocialAccountsPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    void getConnectedSocialAccounts().then((accounts) => {
-      const connectedPlatforms = new Set(accounts.filter((account) => account.connectionStatus === 'connected' && account.tokenStatus === 'valid').map((account) => account.platform));
+    if (!user?.id) return;
+    void getConnectedSocialAccounts(user.id).then((accounts) => {
+      const connectedPlatforms = new Set(accounts.filter(isSocialAccountValid).map((account) => account.platform));
       setPlatforms((current) => current.map((platform) => ({ ...platform, connected: connectedPlatforms.has(platform.id), verified: connectedPlatforms.has(platform.id) })));
     }).catch(() => setMessage('Could not refresh connected accounts.'));
-  }, []);
+  }, [user?.id]);
 
   const handleConnect = async (platform: SocialPlatform) => {
     if (connectingId) return;
+    if (!user?.id) { setMessage('Sign in before connecting an account.'); return; }
     setConnectingId(platform.id);
     setMessage(`Connecting ${platform.name}.`);
     try {
-      const connection = await connectSocialAccount(platform.id);
+      const connection = await connectSocialAccount(user.id, platform.id);
       if (!connection.connected || !connection.verified) {
         setMessage(`${platform.name} connection is not available yet.`);
         return;
@@ -60,7 +64,7 @@ export default function ConnectSocialAccountsPage() {
     setMenuOpen(false);
     Alert.alert('Disconnect all accounts?', 'You will need to reconnect an account before publishing.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Disconnect all', style: 'destructive', onPress: () => { void disconnectAllSocialAccounts().then(() => { setPlatforms((current) => current.map((item) => ({ ...item, connected: false, verified: false }))); setMessage('All social accounts disconnected.'); }); } },
+      { text: 'Disconnect all', style: 'destructive', onPress: () => { if (!user?.id) return; void disconnectAllSocialAccounts(user.id).then(() => { setPlatforms((current) => current.map((item) => ({ ...item, connected: false, verified: false }))); setMessage('All social accounts disconnected.'); }); } },
     ]);
   };
 

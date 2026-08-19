@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { PlatformIcon } from './social-account-card';
-import type { SocialAccount } from './social-accounts';
+import { isSocialAccountValid, type SocialAccount } from './social-accounts';
 
 const LIME = '#A8FF00';
 
@@ -14,11 +14,11 @@ type Props = {
 };
 
 export function ChooseAccountCard({ account, selected, disabled = false, onToggle }: Props) {
-  const expired = account.connectionStatus !== 'connected' || account.tokenStatus !== 'valid';
+  const expired = !isSocialAccountValid(account);
   return <Pressable
     accessibilityRole="checkbox"
     accessibilityLabel={`${account.displayName}, ${account.username}${expired ? ', reconnect required' : ''}`}
-    accessibilityState={{ checked: selected, disabled: disabled || expired }}
+    accessibilityState={{ checked: selected, disabled }}
     disabled={disabled}
     onPress={() => onToggle(account)}
     style={({ pressed }) => [styles.card, selected && styles.cardSelected, expired && styles.cardExpired, pressed && styles.pressed]}
