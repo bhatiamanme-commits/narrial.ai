@@ -1,15 +1,16 @@
 import { useUser } from '@clerk/expo';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { ChooseAccountCard } from '@/features/social-accounts/choose-account-card';
+import { startSchedulingDraft } from '@/features/scheduling/scheduling-service';
 import { getConnectedSocialAccounts, getSavedPublishingTargets, isSocialAccountValid, savePublishingTargets, type SocialAccount } from '@/features/social-accounts/social-accounts';
 
 const LIME = '#A8FF00';
-const NEXT_PUBLISHING_ROUTE = '/generator' as const;
+const NEXT_PUBLISHING_ROUTE = '/schedule-post' as const;
 
 function Icon({ name }: { name: 'back' | 'more' | 'arrow' }) {
   if (name === 'more') return <Svg width={27} height={27} viewBox="0 0 24 24"><Circle cx="5" cy="12" r="1.8" fill="#FFF"/><Circle cx="12" cy="12" r="1.8" fill="#FFF"/><Circle cx="19" cy="12" r="1.8" fill="#FFF"/></Svg>;
@@ -30,12 +31,15 @@ export default function ChooseAccountsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('Checking connected accounts…');
+  const loadGeneration = useRef(0);
 
   const loadAccounts = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true); setError(''); setMessage('Checking connected accounts…');
-    if (!user?.id) { router.replace('/'); setLoading(false); return; }
+    if (!user?.id) { if (generation === loadGeneration.current) { router.replace('/'); setLoading(false); } return; }
     try {
       const nextAccounts = await getConnectedSocialAccounts(user.id);
+      if (generation !== loadGeneration.current) return;
       const validAccounts = nextAccounts.filter(isSocialAccountValid);
       if (validAccounts.length === 0) {
         router.replace({ pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
@@ -47,12 +51,16 @@ export default function ChooseAccountsPage() {
       setSelectedIds(saved.length ? saved : [validAccounts[0].id]);
       setMessage(`${nextAccounts.length} connected ${nextAccounts.length === 1 ? 'account' : 'accounts'} available.`);
     } catch {
+      if (generation !== loadGeneration.current) return;
       setError('We couldn’t load your accounts. Check your internet connection and try again.');
       setMessage('Connected accounts could not be loaded.');
-    } finally { setLoading(false); }
+    } finally { if (generation === loadGeneration.current) setLoading(false); }
   }, [user?.id]);
 
-  useFocusEffect(useCallback(() => { void loadAccounts(); }, [loadAccounts]));
+  useFocusEffect(useCallback(() => {
+    void loadAccounts();
+    return () => { loadGeneration.current += 1; };
+  }, [loadAccounts]));
 
   const toggleAccount = (account: SocialAccount) => {
     if (!isSocialAccountValid(account)) {
@@ -71,6 +79,7 @@ export default function ChooseAccountsPage() {
     setSubmitting(true); setError(''); setMessage('Saving selected accounts.');
     try {
       await savePublishingTargets(user.id, selectedIds);
+      startSchedulingDraft(user.id, 'generated-video-primary');
       router.push(NEXT_PUBLISHING_ROUTE);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Your account selection could not be saved. Please try again.');

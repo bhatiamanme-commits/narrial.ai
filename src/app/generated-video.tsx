@@ -14,7 +14,7 @@ const arrowIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" f
 const regenerateIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg>';
 
 export default function GeneratedVideoScreen() {
-  const { user } = useUser();
+  const { isLoaded, user } = useUser();
   const { height } = useWindowDimensions();
   const [checkingAccounts, setCheckingAccounts] = useState(false);
   const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
@@ -24,7 +24,7 @@ export default function GeneratedVideoScreen() {
   });
 
   const continueToPublishing = async () => {
-    if (checkingAccounts) return;
+    if (!isLoaded || checkingAccounts) return;
     if (!user?.id) { Alert.alert('Sign in required', 'Sign in before choosing publishing accounts.'); return; }
     setCheckingAccounts(true);
     try {
@@ -55,7 +55,7 @@ export default function GeneratedVideoScreen() {
             <SvgXml xml={regenerateIcon} width={31} height={31} />
           </GlassView>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Continue to choose publishing accounts" accessibilityState={{ busy: checkingAccounts, disabled: checkingAccounts }} disabled={checkingAccounts} onPress={continueToPublishing} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Continue to choose publishing accounts" accessibilityState={{ busy: checkingAccounts, disabled: !isLoaded || checkingAccounts }} disabled={!isLoaded || checkingAccounts} onPress={continueToPublishing} style={({ pressed }) => [styles.actionButton, pressed && styles.actionPressed]}>
           <GlassView colorScheme="dark" glassEffectStyle="clear" isInteractive pointerEvents="none" style={styles.glassSurface} tintColor="rgba(255,255,255,0.06)">
             <View pointerEvents="none" style={styles.glassHighlight} />
             {checkingAccounts ? <ActivityIndicator accessibilityLabel="Checking connected accounts" color="#FFFFFF"/> : <SvgXml xml={arrowIcon} width={34} height={34} />}

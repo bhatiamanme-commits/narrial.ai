@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "scheme": "narrial",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
     "ios": {
       "icon": "./assets/expo.icon"
     },

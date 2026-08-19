@@ -88,7 +88,7 @@ export default function GeneratorScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="Generate videos" onPress={generate} style={({ pressed }) => [styles.generateButton, compact && styles.generateButtonCompact, pressed && styles.pressed]}><Text style={styles.generateText}>Generate Videos</Text><Icon name="arrow" color="#000000" size={28} /></Pressable>
         <BottomActionBar
           onOpenSocialConnections={openSocialConnections}
-          onOpenPublishing={() => Alert.alert('Publishing', 'Your published and scheduled posts will appear here.')}
+          onOpenPublishing={() => router.push('/publishing')}
           onOpenAiInsights={() => Alert.alert('AI learning insights', 'See how Narrial learns from your content here.')}
         />
       </View>

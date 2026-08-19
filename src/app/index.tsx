@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
 import { AuthIcon } from '@/components/auth-components';
+import { clearSchedulingDraft } from '@/features/scheduling/scheduling-service';
 import { clearSocialAccountState } from '@/features/social-accounts/social-accounts';
 
 const lime = '#9DFF00';
@@ -25,6 +26,7 @@ export default function WelcomeScreen() {
 
   const handleSignOut = async () => {
     const signedOutUserId = user?.id;
+    clearSchedulingDraft();
     await signOut();
     if (signedOutUserId) clearSocialAccountState(signedOutUserId);
   };

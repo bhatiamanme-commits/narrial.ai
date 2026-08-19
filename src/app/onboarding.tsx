@@ -32,10 +32,13 @@ export default function ConnectSocialAccountsPage() {
 
   useEffect(() => {
     if (!user?.id) return;
+    let cancelled = false;
     void getConnectedSocialAccounts(user.id).then((accounts) => {
+      if (cancelled) return;
       const connectedPlatforms = new Set(accounts.filter(isSocialAccountValid).map((account) => account.platform));
       setPlatforms((current) => current.map((platform) => ({ ...platform, connected: connectedPlatforms.has(platform.id), verified: connectedPlatforms.has(platform.id) })));
-    }).catch(() => setMessage('Could not refresh connected accounts.'));
+    }).catch(() => { if (!cancelled) setMessage('Could not refresh connected accounts.'); });
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   const handleConnect = async (platform: SocialPlatform) => {
