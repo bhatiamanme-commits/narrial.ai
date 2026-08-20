@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/expo';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
@@ -17,6 +18,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useVideoPlayer, VideoView } from 'expo-video';
+
+import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
@@ -154,6 +157,7 @@ function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: Sta
 }
 
 export default function VideoAssistantScreen() {
+  const { user } = useUser();
   const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
@@ -192,8 +196,11 @@ export default function VideoAssistantScreen() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (percentage === 100) AccessibilityInfo.announceForAccessibility('Analysis complete. Question 1 of 4. What are you creating?');
-  }, [percentage]);
+    if (percentage === 100) {
+      AccessibilityInfo.announceForAccessibility('Analysis complete. Question 1 of 4. What are you creating?');
+      if (user?.id) markGeneratedVideoReady(user.id, 'generated-video-primary');
+    }
+  }, [percentage, user?.id]);
   useEffect(() => {
     Animated.sequence([Animated.timing(fade, { toValue: 0, duration: 90, useNativeDriver: true }), Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true })]).start();
     if (percentage === 100 && !state.complete) AccessibilityInfo.announceForAccessibility(`Question ${state.index + 1} of 4. ${currentQuestion.title}`);
@@ -209,7 +216,9 @@ export default function VideoAssistantScreen() {
     setDetails('');
   };
   const advanceQuestion = (action: 'next' | 'skip') => {
-    if (action === 'next' && customActive) dispatch({ type: 'custom', value: details });
+    if (action === 'next' && customActive && details.trim()) {
+      dispatch({ type: 'custom', value: details });
+    }
     dispatch({ type: action });
     setDetails('');
   };

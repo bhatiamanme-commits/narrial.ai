@@ -5,19 +5,21 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { getBackAction } from '@/features/navigation/navigation-utils';
+import { canScheduleGeneratedVideo, clearGeneratedVideoState } from '@/features/publishing/publishing-workflow';
 import { getSavedPublishingTargets } from '@/features/social-accounts/social-accounts';
 import { clearSchedulingDraft, getSchedulingDraft, SchedulingConflictError, schedulePost } from '@/features/scheduling/scheduling-service';
-import { buildCalendarDays, buildScheduledDate, formatScheduleSummary, getDefaultSchedule, getLocalTimezone, type Meridiem, validateSchedule } from '@/features/scheduling/schedule-utils';
+import { buildCalendarDays, buildZonedScheduledDate, formatScheduleSummary, getDefaultSchedule, getLocalTimezone, getTimezoneLabel, type Meridiem, validateSchedule } from '@/features/scheduling/schedule-utils';
 
 const LIME = '#A8FF00';
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const TIMEZONES = [
   getLocalTimezone(),
-  { id: 'UTC', label: 'Coordinated Universal Time (GMT)' },
-  { id: 'America/New_York', label: 'Eastern Time (GMT-4)' },
-  { id: 'America/Los_Angeles', label: 'Pacific Time (GMT-7)' },
-  { id: 'Europe/London', label: 'London Time (GMT+1)' },
-  { id: 'Asia/Kolkata', label: 'India Standard Time (GMT+5:30)' },
+  { id: 'UTC', name: 'Coordinated Universal Time' },
+  { id: 'America/New_York', name: 'Eastern Time' },
+  { id: 'America/Los_Angeles', name: 'Pacific Time' },
+  { id: 'Europe/London', name: 'London Time' },
+  { id: 'Asia/Kolkata', name: 'India Standard Time' },
 ].filter((zone, index, all) => all.findIndex((item) => item.id === zone.id) === index);
 
 function Icon({ name, size = 26, color = '#FFF' }: { name: 'back' | 'more' | 'next' | 'chevron' | 'globe' | 'check'; size?: number; color?: string }) {
@@ -31,6 +33,8 @@ function Icon({ name, size = 26, color = '#FFF' }: { name: 'back' | 'more' | 'ne
 export default function SchedulePostPage() {
   const { isLoaded, user } = useUser();
   const draft = user?.id ? getSchedulingDraft(user.id) : null;
+  const selectedAccountIds = user?.id ? getSavedPublishingTargets(user.id) : [];
+  const hasValidDraft = Boolean(draft && (draft.action !== 'create' || (user?.id && canScheduleGeneratedVideo(user.id, draft.postId, selectedAccountIds))));
   const localZone = TIMEZONES[0];
   const now = new Date();
   const [defaultSchedule] = useState(() => getDefaultSchedule(now));
@@ -44,16 +48,21 @@ export default function SchedulePostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const goBack = () => {
+    const action = getBackAction(router.canGoBack(), '/generator');
+    if (action === 'back') router.back(); else router.replace(action);
+  };
 
   const days = useMemo(() => buildCalendarDays(visibleMonth.getFullYear(), visibleMonth.getMonth()), [visibleMonth]);
-  const scheduledAt = buildScheduledDate(selectedDate, hour, minute, meridiem);
-  const validation = validateSchedule(selectedDate, hour, minute, meridiem);
-  const summary = formatScheduleSummary(validation ? null : scheduledAt, timezone.label);
+  const scheduledAt = buildZonedScheduledDate(selectedDate, hour, minute, meridiem, timezone.id);
+  const validation = validateSchedule(selectedDate, hour, minute, meridiem, timezone.id);
+  const timezoneLabel = getTimezoneLabel(timezone.id, timezone.name, scheduledAt ?? now);
+  const summary = formatScheduleSummary(validation ? null : scheduledAt, timezone.id, timezone.name);
   const monthLabel = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(visibleMonth);
 
   useEffect(() => {
-    if (isLoaded && !draft && !success) router.replace('/generator');
-  }, [draft, isLoaded, success]);
+    if (isLoaded && !hasValidDraft && !success) router.replace('/generator');
+  }, [hasValidDraft, isLoaded, success]);
 
   const changeMonth = (amount: number) => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
   const chooseDay = (day: number) => {
@@ -65,7 +74,8 @@ export default function SchedulePostPage() {
     if (validation || !scheduledAt || submitting || !user?.id) return;
     setSubmitting(true); setError('');
     try {
-      await schedulePost({ userId: user.id, accountIds: getSavedPublishingTargets(user.id), postId: draft?.postId ?? 'generated-video-primary', scheduledAt: scheduledAt.toISOString(), timezone: timezone.id });
+      await schedulePost({ userId: user.id, accountIds: selectedAccountIds, postId: draft?.postId ?? '', scheduledAt: scheduledAt.toISOString(), timezone: timezone.id, action: draft?.action });
+      if (draft?.action === 'create') clearGeneratedVideoState(user.id);
       clearSchedulingDraft();
       setSuccess(true);
     } catch (cause) {
@@ -73,11 +83,11 @@ export default function SchedulePostPage() {
     } finally { setSubmitting(false); }
   };
 
-  if (!isLoaded || (!draft && !success)) return <SafeAreaView style={styles.screen}><View style={styles.guardLoading}><ActivityIndicator accessibilityLabel="Opening generator" color={LIME}/></View></SafeAreaView>;
-  if (success) return <SafeAreaView style={styles.screen}><View accessibilityLiveRegion="polite" style={styles.successPage}><View style={styles.successIcon}><Icon name="check" size={42} color="#050505"/></View><Text accessibilityRole="header" style={styles.successTitle}>Post scheduled</Text><Text style={styles.successCopy}>{formatScheduleSummary(scheduledAt, timezone.label)}</Text><Pressable accessibilityRole="button" onPress={() => router.replace('/publishing')} style={styles.doneButton}><Text style={styles.doneText}>View scheduled posts</Text></Pressable></View></SafeAreaView>;
+  if (!isLoaded || (!hasValidDraft && !success)) return <SafeAreaView style={styles.screen}><View style={styles.guardLoading}><ActivityIndicator accessibilityLabel="Opening generator" color={LIME}/></View></SafeAreaView>;
+  if (success) return <SafeAreaView style={styles.screen}><View accessibilityLiveRegion="polite" style={styles.successPage}><View style={styles.successIcon}><Icon name="check" size={42} color="#050505"/></View><Text accessibilityRole="header" style={styles.successTitle}>Post scheduled</Text><Text style={styles.successCopy}>{formatScheduleSummary(scheduledAt, timezone.id, timezone.name)}</Text><Pressable accessibilityRole="button" onPress={() => router.replace('/publishing')} style={styles.doneButton}><Text style={styles.doneText}>View scheduled posts</Text></Pressable></View></SafeAreaView>;
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}><View style={styles.page}>
-    <View style={styles.topBar}><Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="back"/></Pressable><Text style={styles.eyebrow}>SCHEDULE</Text><Pressable accessibilityRole="button" accessibilityLabel="Schedule options" onPress={() => setTimezoneOpen(true)} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="more"/></Pressable></View>
+    <View style={styles.topBar}><Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="back"/></Pressable><Text style={styles.eyebrow}>SCHEDULE</Text><Pressable accessibilityRole="button" accessibilityLabel="Schedule options" onPress={() => setTimezoneOpen(true)} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="more"/></Pressable></View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text accessibilityRole="header" style={styles.title}>Schedule Post</Text><Text style={styles.subtitle}>Choose one date and time for this post.</Text>
       <Text style={styles.label}>POST DATE</Text>
@@ -90,12 +100,12 @@ export default function SchedulePostPage() {
         })}</View>
       </View>
       <Text style={styles.label}>POST TIME</Text><View style={styles.timeRow}><TextInput accessibilityLabel="Hour" value={hour} onChangeText={(value) => setHour(value.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" maxLength={2} placeholder="10" placeholderTextColor="#777" style={styles.timeInput}/><Text style={styles.colon}>:</Text><TextInput accessibilityLabel="Minute" value={minute} onChangeText={(value) => setMinute(value.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" maxLength={2} placeholder="30" placeholderTextColor="#777" style={styles.timeInput}/><Pressable accessibilityRole="button" accessibilityLabel={`Time period ${meridiem}`} onPress={() => setMeridiem((value) => value === 'AM' ? 'PM' : 'AM')} style={styles.meridiem}><Text style={styles.meridiemText}>{meridiem}</Text><Icon name="chevron" size={20}/></Pressable></View><Text style={styles.helper}>One publishing time per post</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Change time zone, currently ${timezone.label}`} onPress={() => setTimezoneOpen(true)} style={styles.timezoneRow}><Icon name="globe" size={34} color="#AAA"/><View style={styles.timezoneCopy}><Text style={styles.timezoneCaption}>Time zone</Text><Text numberOfLines={2} style={styles.timezoneValue}>{timezone.label}</Text></View><Icon name="chevron" color="#AAA"/></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Change time zone, currently ${timezoneLabel}`} onPress={() => setTimezoneOpen(true)} style={styles.timezoneRow}><Icon name="globe" size={34} color="#AAA"/><View style={styles.timezoneCopy}><Text style={styles.timezoneCaption}>Time zone</Text><Text numberOfLines={2} style={styles.timezoneValue}>{timezoneLabel}</Text></View><Icon name="chevron" color="#AAA"/></Pressable>
       <Text accessibilityLiveRegion="polite" style={[styles.summary, error && styles.error]}>{error || summary}</Text>
     </ScrollView>
     <Pressable accessibilityRole="button" accessibilityLabel="Schedule post" accessibilityState={{ disabled: Boolean(validation) || submitting, busy: submitting }} disabled={Boolean(validation) || submitting} onPress={submit} style={({ pressed }) => [styles.submit, (validation || submitting) && styles.disabled, pressed && styles.pressed]}>{submitting ? <ActivityIndicator color="#050505"/> : <Text style={styles.submitText}>Schedule Post</Text>}<View style={styles.submitArrow}><Icon name="next"/></View></Pressable>
   </View>
-  <Modal visible={timezoneOpen} transparent animationType="fade" onRequestClose={() => setTimezoneOpen(false)}><Pressable accessibilityRole="button" accessibilityLabel="Close time zone chooser" onPress={() => setTimezoneOpen(false)} style={styles.backdrop}><View accessibilityRole="menu" style={styles.sheet} onStartShouldSetResponder={() => true}><Text accessibilityRole="header" style={styles.sheetTitle}>Choose time zone</Text>{TIMEZONES.map((zone) => <Pressable key={zone.id} accessibilityRole="menuitem" accessibilityState={{ selected: zone.id === timezone.id }} onPress={() => { setTimezone(zone); setTimezoneOpen(false); }} style={styles.zoneOption}><Text style={[styles.zoneText, zone.id === timezone.id && styles.zoneSelected]}>{zone.label}</Text>{zone.id === timezone.id && <Icon name="check" size={22} color={LIME}/>}</Pressable>)}</View></Pressable></Modal>
+  <Modal visible={timezoneOpen} transparent animationType="fade" onRequestClose={() => setTimezoneOpen(false)}><Pressable accessibilityRole="button" accessibilityLabel="Close time zone chooser" onPress={() => setTimezoneOpen(false)} style={styles.backdrop}><View accessibilityRole="menu" style={styles.sheet} onStartShouldSetResponder={() => true}><Text accessibilityRole="header" style={styles.sheetTitle}>Choose time zone</Text>{TIMEZONES.map((zone) => { const zoneInstant = buildZonedScheduledDate(selectedDate, hour, minute, meridiem, zone.id) ?? now; return <Pressable key={zone.id} accessibilityRole="menuitem" accessibilityState={{ selected: zone.id === timezone.id }} onPress={() => { setTimezone(zone); setTimezoneOpen(false); }} style={styles.zoneOption}><Text style={[styles.zoneText, zone.id === timezone.id && styles.zoneSelected]}>{getTimezoneLabel(zone.id, zone.name, zoneInstant)}</Text>{zone.id === timezone.id && <Icon name="check" size={22} color={LIME}/>}</Pressable>; })}</View></Pressable></Modal>
   </SafeAreaView>;
 }
 

@@ -1,12 +1,14 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useUser } from '@clerk/expo';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NarrialButton } from '@/components/narrial-button';
 import { ContentPerformanceCard, PublishedPostCard, PublishingTabs, PublishingThumbnail } from '@/features/publishing/publishing-components';
-import { filterPublishedPosts, PUBLISHED_POSTS, PUBLISHING_WEEK, type PlatformFilter, type ScheduledPost, type TimeRange } from '@/features/publishing/publishing-data';
+import { applyScheduledOperations, filterPublishedPosts, formatMetric, getContentPerformance, PUBLISHED_POSTS, PUBLISHING_WEEK, type PlatformFilter, type ScheduledPost, type TimeRange } from '@/features/publishing/publishing-data';
 import { PublishingIcon } from '@/features/publishing/publishing-icons';
+import { getScheduledPosts, startSchedulingDraft, type ScheduledPost as PersistedScheduledPost, type SchedulingAction } from '@/features/scheduling/scheduling-service';
 
 const LIME = '#A8FF00';
 const ranges: { value: TimeRange; label: string }[] = [{ value: '7-days', label: 'Last 7 days' }, { value: '30-days', label: 'Last 30 days' }, { value: 'all-time', label: 'All time' }];
@@ -35,19 +37,30 @@ function ScheduleCard({ post, compact, onMenu }: { post: ScheduledPost; compact:
 }
 
 function ScheduledContent({ compact }: { compact: boolean }) {
+  const { user } = useUser();
   const [selectedDayId, setSelectedDayId] = useState(PUBLISHING_WEEK.find((day) => day.isToday)?.id ?? PUBLISHING_WEEK[0].id);
-  const selectedDay = PUBLISHING_WEEK.find((day) => day.id === selectedDayId) ?? PUBLISHING_WEEK[0];
+  const [scheduledOperations, setScheduledOperations] = useState<PersistedScheduledPost[]>([]);
+  useFocusEffect(useCallback(() => {
+    setScheduledOperations(user?.id ? getScheduledPosts(user.id) : []);
+  }, [user?.id]));
+  const week = useMemo(() => applyScheduledOperations(PUBLISHING_WEEK, scheduledOperations), [scheduledOperations]);
+  const selectedDay = week.find((day) => day.id === selectedDayId) ?? week[0];
   const posts = selectedDay.posts;
-  const scheduledCount = PUBLISHING_WEEK.reduce((total, day) => total + day.posts.length, 0);
-  const approvalCount = PUBLISHING_WEEK.flatMap((day) => day.posts).filter((post) => post.status === 'needs-approval').length;
+  const scheduledCount = week.reduce((total, day) => total + day.posts.length, 0);
+  const approvalCount = week.flatMap((day) => day.posts).filter((post) => post.status === 'needs-approval').length;
   const openGenerator = () => router.push('/generator');
+  const openSchedulingAction = (post: ScheduledPost, action: Exclude<SchedulingAction, 'create'>) => {
+    if (!user?.id) { Alert.alert('Sign in required', 'Sign in before changing scheduled posts.'); return; }
+    startSchedulingDraft(user.id, post.id, action);
+    router.push('/schedule-post');
+  };
   const dayLabel = selectedDay.isToday ? 'Today' : `${selectedDay.weekday[0]}${selectedDay.weekday.slice(1).toLowerCase()}`;
 
   return <>
-    <View style={styles.weekSection}><Text style={styles.weekRange}>AUG 18–24</Text><View accessibilityRole="tablist" accessibilityLabel="Publishing week" style={styles.weekRow}>{PUBLISHING_WEEK.map((day, index) => <View key={day.id} style={styles.dayCellWrap}><Pressable accessibilityRole="tab" accessibilityLabel={`${day.weekday}, August ${day.date}${day.hasPosts ? ', posts scheduled' : ''}`} accessibilityState={{ selected: selectedDayId === day.id }} onPress={() => setSelectedDayId(day.id)} style={({ pressed }) => [styles.dayCell, selectedDayId === day.id && styles.dayCellSelected, pressed && styles.pressed]}><Text style={[styles.weekday, selectedDayId === day.id && styles.dayTextSelected]}>{day.weekday}</Text><Text style={[styles.dayNumber, selectedDayId === day.id && styles.dayTextSelected]}>{day.date}</Text></Pressable><View style={[styles.dayDot, day.hasPosts && styles.dayDotActive, selectedDayId === day.id && styles.dayDotSelected]}/>{index < PUBLISHING_WEEK.length - 1 && <View style={styles.dayDivider}/>}</View>)}</View></View>
+    <View style={styles.weekSection}><Text style={styles.weekRange}>AUG 18–24</Text><View accessibilityRole="tablist" accessibilityLabel="Publishing week" style={styles.weekRow}>{week.map((day, index) => <View key={day.id} style={styles.dayCellWrap}><Pressable accessibilityRole="tab" accessibilityLabel={`${day.weekday}, August ${day.date}${day.hasPosts ? ', posts scheduled' : ''}`} accessibilityState={{ selected: selectedDayId === day.id }} onPress={() => setSelectedDayId(day.id)} style={({ pressed }) => [styles.dayCell, selectedDayId === day.id && styles.dayCellSelected, pressed && styles.pressed]}><Text style={[styles.weekday, selectedDayId === day.id && styles.dayTextSelected]}>{day.weekday}</Text><Text style={[styles.dayNumber, selectedDayId === day.id && styles.dayTextSelected]}>{day.date}</Text></Pressable><View style={[styles.dayDot, day.hasPosts && styles.dayDotActive, selectedDayId === day.id && styles.dayDotSelected]}/>{index < week.length - 1 && <View style={styles.dayDivider}/>}</View>)}</View></View>
     <View style={[styles.scheduleSummaries, compact && styles.scheduleSummariesCompact]}><ScheduleSummary compact={compact} icon="calendar" value={String(scheduledCount)} label="Scheduled"/><ScheduleSummary compact={compact} icon="warning" value={String(approvalCount)} label="Need approval" warning/><ScheduleSummary compact={compact} icon="layers" value="3" label="Platforms"/></View>
     <View style={[styles.todayHeader, compact && styles.todayHeaderCompact]}><View><Text accessibilityRole="header" style={styles.todayTitle}>{dayLabel}</Text><Text style={styles.todayDate}>{selectedDay.weekday === 'WED' ? 'Wednesday' : dayLabel}, {selectedDay.date} August</Text></View><View accessible accessibilityLabel="AI recommendation: Best audience window 8:45 to 9:30 AM" style={[styles.recommendation, compact && styles.recommendationCompact]}><PublishingIcon name="sparkle" color="#D8D8D8"/><Text style={styles.recommendationText}>Best audience window: 8:45–9:30 AM</Text></View></View>
-    {posts.length ? <View style={styles.timeline}>{posts.map((post) => <ScheduleCard key={post.id} post={post} compact={compact} onMenu={() => Alert.alert(post.title, 'Choose an action', [{ text: 'Reschedule', onPress: () => Alert.alert('Reschedule', 'Date and time controls are ready for the publishing API.') }, { text: 'Duplicate', onPress: () => Alert.alert('Duplicated', 'A mock copy was added to the scheduling workflow.') }, { text: 'Cancel', style: 'cancel' }])}/>)}</View> : <View accessibilityRole="summary" style={styles.emptyState}><PublishingIcon name="calendar" color={LIME} size={32}/><Text style={styles.emptyTitle}>Nothing scheduled</Text><Text style={styles.emptyCopy}>This day is open. Add a video to keep your publishing rhythm going.</Text></View>}
+    {posts.length ? <View style={styles.timeline}>{posts.map((post) => <ScheduleCard key={post.id} post={post} compact={compact} onMenu={() => Alert.alert(post.title, 'Choose an action', [{ text: 'Reschedule', onPress: () => openSchedulingAction(post, 'reschedule') }, { text: 'Duplicate', onPress: () => openSchedulingAction(post, 'duplicate') }, { text: 'Cancel', style: 'cancel' }])}/>)}</View> : <View accessibilityRole="summary" style={styles.emptyState}><PublishingIcon name="calendar" color={LIME} size={32}/><Text style={styles.emptyTitle}>Nothing scheduled</Text><Text style={styles.emptyCopy}>This day is open. Add a video to keep your publishing rhythm going.</Text></View>}
     <Pressable accessibilityRole="button" accessibilityLabel="Schedule another video" onPress={openGenerator} style={({ pressed }) => [styles.emptySlot, pressed && styles.pressed]}><View style={styles.plusCircle}><PublishingIcon name="plus" color="#D8D8D8"/></View><Text style={styles.emptySlotText}>Schedule another video</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Create and schedule" onPress={openGenerator} style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}><PublishingIcon name="calendar" color="#080808" size={28}/><Text style={styles.createButtonText}>Create & schedule</Text></Pressable>
   </>;
@@ -62,6 +75,7 @@ export default function PublishingPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [state, setState] = useState<'ready' | 'loading' | 'error'>('ready');
   const posts = useMemo(() => filterPublishedPosts(PUBLISHED_POSTS, range, platform), [range, platform]);
+  const performance = useMemo(() => getContentPerformance(posts), [posts]);
   const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < 2 ? [...current, id] : [current[1], id]);
 
   const compare = () => selected.length < 2 ? Alert.alert('Select two posts', 'Tap any two post cards, then choose Compare posts.') : Alert.alert('Post comparison', `${selected.map((id) => PUBLISHED_POSTS.find((post) => post.id === id)?.title).join(' vs. ')} selected for comparison.`);
@@ -72,7 +86,7 @@ export default function PublishingPage() {
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       {tab === 'scheduled' ? <ScheduledContent compact={compact}/> : <>
         <View style={styles.filters}><FilterSelect label="Time range" options={ranges} value={range} onChange={setRange}/><FilterSelect label="Platform" options={platforms} value={platform} onChange={setPlatform}/><Pressable accessibilityRole="button" accessibilityLabel="More filters" onPress={() => Alert.alert('More filters', 'Status, performance, and destination filters can be connected here.')} style={styles.filterButton}><PublishingIcon name="filter"/></Pressable></View>
-        <View style={styles.section}><Text accessibilityRole="header" style={styles.sectionTitle}>Content performance</Text><Text style={styles.dateRange}>{range === '7-days' ? '19–25 August' : range === '30-days' ? 'Last 30 days' : 'All publishing history'}</Text><ContentPerformanceCard posts={posts.length} views="248K" engagement="8.4%"/></View>
+        <View style={styles.section}><Text accessibilityRole="header" style={styles.sectionTitle}>Content performance</Text><Text style={styles.dateRange}>{range === '7-days' ? '19–25 August' : range === '30-days' ? 'Last 30 days' : 'All publishing history'}</Text><ContentPerformanceCard posts={posts.length} views={formatMetric(performance.views)} engagement={`${performance.engagement}%`}/></View>
         <View style={styles.section}><View style={styles.sectionHeader}><Text accessibilityRole="header" style={styles.sectionTitle}>Recent posts</Text><Pressable accessibilityRole="link" onPress={() => Alert.alert('Analytics', 'Opening the full publishing analytics workspace.')}><Text style={styles.analyticsLink}>View analytics</Text></Pressable></View>
           {state === 'loading' ? <View accessibilityLabel="Loading published posts" accessibilityState={{ busy: true }} style={styles.stateCard}><ActivityIndicator color={LIME}/><Text style={styles.stateCopy}>Loading published posts…</Text></View> : state === 'error' ? <View style={styles.stateCard}><Text style={styles.stateTitle}>Posts unavailable</Text><Text style={styles.stateCopy}>We couldn’t load publishing history.</Text><Pressable accessibilityRole="button" onPress={() => setState('ready')} style={styles.retry}><Text style={styles.retryText}>Try again</Text></Pressable></View> : posts.length === 0 ? <View style={styles.stateCard}><Text style={styles.stateTitle}>No published posts</Text><Text style={styles.stateCopy}>No posts match these filters. Try another platform or time range.</Text><Pressable accessibilityRole="button" onPress={() => { setPlatform('all'); setRange('all-time'); }} style={styles.retry}><Text style={styles.retryText}>Clear filters</Text></Pressable></View> : <View style={styles.list}>{posts.map((post) => <PublishedPostCard key={post.id} post={post} selected={selected.includes(post.id)} onToggle={() => toggle(post.id)} onMenu={() => Alert.alert(post.title, 'View details, retry failed destinations, duplicate, or remove this post from history.')} />)}</View>}
         </View>

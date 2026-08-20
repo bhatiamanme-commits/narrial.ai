@@ -4,6 +4,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { SocialPlatformId } from '@/features/social-accounts/social-accounts';
 
 import { formatMetric, type PublishingPost } from './publishing-data';
+import { getContentScoreGauge } from './publishing-gauge';
 import { PublishingIcon } from './publishing-icons';
 
 const LIME = '#A8FF00';
@@ -39,7 +40,7 @@ export function PublishedPostCard({ post, selected, onToggle, onMenu }: { post: 
   return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: selected }} accessibilityLabel={`Select ${post.title} for comparison`} onPress={onToggle} style={[styles.postCard, selected && styles.selectedCard]}>
     <PublishingThumbnail thumbnail={post.thumbnail} duration={post.duration} platforms={post.platforms}/><View style={styles.postContent}>
       <View style={styles.postTitleRow}><Text numberOfLines={2} style={styles.postTitle}>{post.title}</Text><Pressable accessibilityRole="button" accessibilityLabel={`More options for ${post.title}`} onPress={(event) => { event.stopPropagation(); onMenu(); }} hitSlop={10} style={styles.more}><PublishingIcon name="more"/></Pressable></View>
-      <Text style={styles.postDate}>{post.publishedAt}</Text>
+      <Text style={styles.postDate}>{post.publishedAtLabel}</Text>
       <View style={styles.status}><PublishingIcon name="check" size={20} color={post.status === 'published' ? LIME : '#FFD44A'}/><Text style={[styles.statusText, post.status === 'partial' && styles.partialText]}>{post.status === 'published' ? 'Published' : 'Partially published'}</Text></View>
       <View style={styles.divider}/><View style={styles.metrics}><Metric icon="eye" value={post.views} label="views"/><Metric icon="heart" value={post.likes} label="likes"/><Metric icon="share" value={post.shares} label="shares"/>{post.topPerformer && <View accessible accessibilityLabel="Top performer" style={styles.badge}><PublishingIcon name="sparkle" size={15} color="#FFD400"/><Text style={styles.badgeText}>Top performer</Text></View>}</View>
     </View>
@@ -52,8 +53,9 @@ export function SummaryCard({ icon, value, label, change }: { icon: 'calendar' |
 
 export function ContentPerformanceCard({ posts, views, engagement, score = 82 }: { posts: number; views: string; engagement: string; score?: number }) {
   const metrics = [{ value: String(posts), label: 'Posts' }, { value: views, label: 'Views' }, { value: engagement, label: 'Engagement' }];
-  return <View accessible accessibilityLabel={`Content performance score ${score} out of 100. ${posts} posts, ${views} views, ${engagement} engagement.`} style={styles.performanceCard}>
-    <View style={styles.gaugeWrap}><Svg width="100%" height={132} viewBox="0 0 240 132"><Path d="M20 116 A100 100 0 0 1 220 116" fill="none" stroke="#252A20" strokeWidth="12" strokeLinecap="round"/><Path d="M20 116 A100 100 0 0 1 220 116" fill="none" stroke={LIME} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${Math.round(314 * score / 100)} 314`}/><Circle cx="211" cy="74" r="5" fill="#FFF"/></Svg><View style={styles.gaugeScore}><Text style={styles.scoreValue}>{score}<Text style={styles.scoreTotal}>/100</Text></Text><Text style={styles.scoreLabel}>CONTENT SCORE</Text><Text style={styles.scoreTrend}>↑ 18% this week</Text></View></View>
+  const gauge = getContentScoreGauge(score);
+  return <View accessible accessibilityLabel={`Content performance score ${gauge.score} out of 100. ${posts} posts, ${views} views, ${engagement} engagement.`} style={styles.performanceCard}>
+    <View style={styles.gaugeWrap}><Svg width="100%" height={132} viewBox="0 0 240 132"><Path d="M20 116 A100 100 0 0 1 220 116" fill="none" stroke="#252A20" strokeWidth="12" strokeLinecap="round"/><Path d="M20 116 A100 100 0 0 1 220 116" fill="none" stroke={LIME} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${gauge.dashLength} 314`}/><Circle cx={gauge.cx} cy={gauge.cy} r="5" fill="#FFF"/></Svg><View style={styles.gaugeScore}><Text style={styles.scoreValue}>{gauge.score}<Text style={styles.scoreTotal}>/100</Text></Text><Text style={styles.scoreLabel}>CONTENT SCORE</Text><Text style={styles.scoreTrend}>↑ 18% this week</Text></View></View>
     <View style={styles.performanceMetrics}>{metrics.map((metric, index) => <View key={metric.label} style={[styles.performanceMetric, index > 0 && styles.performanceMetricBorder]}><Text style={styles.performanceValue}>{metric.value}</Text><Text style={styles.performanceLabel}>{metric.label}</Text><Text style={styles.performanceTrend}>↑ 18%</Text></View>)}</View>
   </View>;
 }

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
 import { AuthIcon } from '@/components/auth-components';
+import { clearGeneratedVideoState } from '@/features/publishing/publishing-workflow';
 import { clearSchedulingDraft } from '@/features/scheduling/scheduling-service';
 import { clearSocialAccountState } from '@/features/social-accounts/social-accounts';
 
@@ -26,9 +27,17 @@ export default function WelcomeScreen() {
 
   const handleSignOut = async () => {
     const signedOutUserId = user?.id;
-    clearSchedulingDraft();
-    await signOut();
-    if (signedOutUserId) clearSocialAccountState(signedOutUserId);
+    try {
+      await signOut();
+      clearSchedulingDraft();
+      if (signedOutUserId) {
+        clearGeneratedVideoState(signedOutUserId);
+        clearSocialAccountState(signedOutUserId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      Alert.alert('Sign out failed', message);
+    }
   };
 
   const authenticate = async (mode: 'sign-in' | 'sign-up', action: 'google' | 'email' | 'sign-in') => {

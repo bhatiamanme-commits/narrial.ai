@@ -5,7 +5,9 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { getBackAction } from '@/features/navigation/navigation-utils';
 import { ChooseAccountCard } from '@/features/social-accounts/choose-account-card';
+import { getPublishableGeneratedVideo } from '@/features/publishing/publishing-workflow';
 import { startSchedulingDraft } from '@/features/scheduling/scheduling-service';
 import { getConnectedSocialAccounts, getSavedPublishingTargets, isSocialAccountValid, savePublishingTargets, type SocialAccount } from '@/features/social-accounts/social-accounts';
 
@@ -23,7 +25,8 @@ function AccountListSkeleton() {
 }
 
 export default function ChooseAccountsPage() {
-  const { user } = useUser();
+  const { isLoaded, user } = useUser();
+  const publishingVideo = user?.id ? getPublishableGeneratedVideo(user.id) : null;
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,11 +35,21 @@ export default function ChooseAccountsPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('Checking connected accounts…');
   const loadGeneration = useRef(0);
+  const goBack = () => {
+    const action = getBackAction(router.canGoBack(), '/onboarding');
+    if (action === 'back') router.back(); else router.replace(action);
+  };
 
   const loadAccounts = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    if (!isLoaded) return;
     setLoading(true); setError(''); setMessage('Checking connected accounts…');
     if (!user?.id) { if (generation === loadGeneration.current) { router.replace('/'); setLoading(false); } return; }
+    if (!getPublishableGeneratedVideo(user.id)) {
+      router.replace('/generator');
+      setLoading(false);
+      return;
+    }
     try {
       const nextAccounts = await getConnectedSocialAccounts(user.id);
       if (generation !== loadGeneration.current) return;
@@ -55,7 +68,7 @@ export default function ChooseAccountsPage() {
       setError('We couldn’t load your accounts. Check your internet connection and try again.');
       setMessage('Connected accounts could not be loaded.');
     } finally { if (generation === loadGeneration.current) setLoading(false); }
-  }, [user?.id]);
+  }, [isLoaded, user?.id]);
 
   useFocusEffect(useCallback(() => {
     void loadAccounts();
@@ -76,10 +89,12 @@ export default function ChooseAccountsPage() {
 
   const handleNext = async () => {
     if (!selectedIds.length || submitting || !user?.id) return;
+    const generatedVideo = getPublishableGeneratedVideo(user.id);
+    if (!generatedVideo) { router.replace('/generator'); return; }
     setSubmitting(true); setError(''); setMessage('Saving selected accounts.');
     try {
       await savePublishingTargets(user.id, selectedIds);
-      startSchedulingDraft(user.id, 'generated-video-primary');
+      startSchedulingDraft(user.id, generatedVideo.videoId);
       router.push(NEXT_PUBLISHING_ROUTE);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Your account selection could not be saved. Please try again.');
@@ -87,8 +102,12 @@ export default function ChooseAccountsPage() {
     } finally { setSubmitting(false); }
   };
 
+  if (!isLoaded || !publishingVideo) {
+    return <SafeAreaView style={styles.screen}><View style={styles.guardLoading}><ActivityIndicator accessibilityLabel="Opening video generator" color={LIME}/></View></SafeAreaView>;
+  }
+
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}><View style={styles.page}>
-    <View style={styles.topBar}><Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="back"/></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Account options" accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="more"/></Pressable></View>
+    <View style={styles.topBar}><Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="back"/></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Account options" accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="more"/></Pressable></View>
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>Choose Accounts</Text><Text style={styles.subtitle}>Select the accounts where Narrial will publish your generated videos.</Text></View>
       {loading ? <AccountListSkeleton/> : error ? <View style={styles.stateCard}><Text style={styles.stateTitle}>Accounts unavailable</Text><Text style={styles.stateCopy}>{error}</Text><Pressable accessibilityRole="button" onPress={loadAccounts} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable></View> : accounts.length === 0 ? <View style={styles.stateCard}><Text style={styles.stateTitle}>No connected accounts</Text><Pressable accessibilityRole="button" onPress={() => router.replace('/onboarding')} style={styles.retryButton}><Text style={styles.retryText}>Connect an account</Text></Pressable></View> : <View style={styles.list}>{accounts.map((account) => <ChooseAccountCard key={account.id} account={account} selected={selectedIds.includes(account.id)} disabled={submitting} onToggle={toggleAccount}/>)}</View>}
@@ -101,7 +120,7 @@ export default function ChooseAccountsPage() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#020202' }, page: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 10, paddingBottom: 12 },
+  screen: { flex: 1, backgroundColor: '#020202' }, guardLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' }, page: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 10, paddingBottom: 12 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }, circleButton: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: LIME, backgroundColor: '#050505' }, pressed: { opacity: 0.76, transform: [{ scale: 0.985 }] },
   scrollContent: { paddingTop: 22, paddingBottom: 18 }, heading: { marginBottom: 30 }, title: { color: '#F7F7F7', fontSize: 38, lineHeight: 44, fontWeight: '800', letterSpacing: -0.9 }, subtitle: { marginTop: 12, color: '#AAAAAA', fontSize: 18, lineHeight: 27 }, list: { gap: 12 },
   skeletonCard: { minHeight: 92, flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 18, backgroundColor: '#111211' }, skeletonAvatar: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#252625' }, skeletonCopy: { flex: 1, gap: 9, marginLeft: 18 }, skeletonName: { width: '58%', height: 16, borderRadius: 8, backgroundColor: '#292A29' }, skeletonHandle: { width: '42%', height: 13, borderRadius: 7, backgroundColor: '#222322' },

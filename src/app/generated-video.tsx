@@ -3,10 +3,11 @@ import { StatusBar } from 'expo-status-bar';
 import { GlassView } from 'expo-glass-effect';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
+import { getGeneratedVideo, markGeneratedVideoReviewed } from '@/features/publishing/publishing-workflow';
 import { getConnectedSocialAccounts, isSocialAccountValid } from '@/features/social-accounts/social-accounts';
 
 const GENERATED_VIDEO = require('../../assets/videos/chihuahua-bully-crocodile.mp4');
@@ -17,17 +18,24 @@ export default function GeneratedVideoScreen() {
   const { isLoaded, user } = useUser();
   const { height } = useWindowDimensions();
   const [checkingAccounts, setCheckingAccounts] = useState(false);
+  const generatedVideo = user?.id ? getGeneratedVideo(user.id) : null;
   const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
     instance.loop = true;
     instance.muted = false;
     instance.play();
   });
 
+  useEffect(() => {
+    if (isLoaded && (!user?.id || !generatedVideo)) router.replace('/generator');
+  }, [generatedVideo, isLoaded, user?.id]);
+
   const continueToPublishing = async () => {
     if (!isLoaded || checkingAccounts) return;
     if (!user?.id) { Alert.alert('Sign in required', 'Sign in before choosing publishing accounts.'); return; }
+    if (!generatedVideo) { router.replace('/generator'); return; }
     setCheckingAccounts(true);
     try {
+      markGeneratedVideoReviewed(user.id, generatedVideo.videoId);
       const accounts = await getConnectedSocialAccounts(user.id);
       const hasValidAccount = accounts.some(isSocialAccountValid);
       router.push(hasValidAccount ? '/choose-accounts' : { pathname: '/onboarding', params: { returnTo: '/choose-accounts' } });
@@ -35,6 +43,10 @@ export default function GeneratedVideoScreen() {
       Alert.alert('Couldn’t check accounts', 'Check your internet connection and try again.');
     } finally { setCheckingAccounts(false); }
   };
+
+  if (!isLoaded || !user?.id || !generatedVideo) {
+    return <View style={styles.screen}><ActivityIndicator accessibilityLabel="Opening video generator" color="#FFFFFF"/></View>;
+  }
 
   return (
     <View style={styles.screen}>

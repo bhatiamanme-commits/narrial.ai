@@ -1,10 +1,12 @@
 import { useUser } from '@clerk/expo';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { getBackAction } from '@/features/navigation/navigation-utils';
+import { getPublishableGeneratedVideo } from '@/features/publishing/publishing-workflow';
 import { SocialAccountCard } from '@/features/social-accounts/social-account-card';
 import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, isSocialAccountValid, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
 
@@ -22,6 +24,7 @@ function CircularIconButton({ label, icon, onPress, expanded }: CircularIconButt
 
 export default function ConnectSocialAccountsPage() {
   const { user } = useUser();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { height, width } = useWindowDimensions();
   const compact = height < 780 || width < 360;
   const [platforms, setPlatforms] = useState(INITIAL_SOCIAL_PLATFORMS);
@@ -29,8 +32,15 @@ export default function ConnectSocialAccountsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [message, setMessage] = useState('');
+  const continueToPublishing = returnTo === '/choose-accounts' && Boolean(user?.id && getPublishableGeneratedVideo(user.id));
+  const continueDestination = continueToPublishing ? '/choose-accounts' : '/generator';
+  const goBack = () => {
+    const action = getBackAction(router.canGoBack(), '/');
+    if (action === 'back') router.back(); else router.replace(action);
+  };
 
   useEffect(() => {
+    setPlatforms(INITIAL_SOCIAL_PLATFORMS);
     if (!user?.id) return;
     let cancelled = false;
     void getConnectedSocialAccounts(user.id).then((accounts) => {
@@ -55,7 +65,7 @@ export default function ConnectSocialAccountsPage() {
       setPlatforms((current) => current.map((item) => item.id === platform.id ? { ...item, connected: connection.connected, verified: connection.verified } : item));
       setMessage(`${platform.name} connected successfully.`);
       await new Promise((resolve) => setTimeout(resolve, 350));
-      router.replace('/choose-accounts');
+      router.replace(continueDestination);
     } catch {
       setMessage(`Could not connect ${platform.name}. Please try again.`);
     } finally {
@@ -73,16 +83,17 @@ export default function ConnectSocialAccountsPage() {
 
   const handleContinue = async () => {
     if (continuing) return;
+    if (!user?.id) { setMessage('Sign in before choosing publishing accounts.'); return; }
     const connected = platforms.some((platform) => platform.connected && platform.verified);
     if (!connected) { setMessage('Connect at least one social account to continue.'); return; }
     setContinuing(true);
-    setMessage('Opening account selection.');
+    setMessage(continueToPublishing ? 'Opening account selection.' : 'Opening video generator.');
     await new Promise((resolve) => setTimeout(resolve, 250));
-    router.replace('/choose-accounts');
+    router.replace(continueDestination);
   };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}><View style={styles.page}>
-    <View style={styles.topBar}><CircularIconButton label="Go back" icon={<BackIcon/>} onPress={() => router.back()}/><View style={styles.topActions}><CircularIconButton label="More options" icon={<MoreIcon/>} expanded={menuOpen} onPress={() => setMenuOpen(true)}/><CircularIconButton label="Cancel account connection" icon={<CloseIcon/>} onPress={() => router.back()}/></View></View>
+    <View style={styles.topBar}><CircularIconButton label="Go back" icon={<BackIcon/>} onPress={goBack}/><View style={styles.topActions}><CircularIconButton label="More options" icon={<MoreIcon/>} expanded={menuOpen} onPress={() => setMenuOpen(true)}/><CircularIconButton label="Cancel account connection" icon={<CloseIcon/>} onPress={goBack}/></View></View>
     <ScrollView contentContainerStyle={[styles.scrollContent, compact && styles.scrollContentCompact]} showsVerticalScrollIndicator={false}>
       <View style={styles.headingBlock}><Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}>Connect Social Accounts</Text><Text style={[styles.subtitle, compact && styles.subtitleCompact]}>Connect your accounts so Narrial can publish your generated videos.</Text></View>
       <View style={[styles.list, compact && styles.listCompact]}>{platforms.map((platform) => <SocialAccountCard key={platform.id} platform={platform} connecting={connectingId === platform.id} compact={compact} onConnect={handleConnect}/>)}</View>
