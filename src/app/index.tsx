@@ -29,8 +29,8 @@ export default function WelcomeScreen() {
     const signedOutUserId = user?.id;
     try {
       await signOut();
-      clearSchedulingDraft();
       if (signedOutUserId) {
+        clearSchedulingDraft(signedOutUserId);
         clearGeneratedVideoState(signedOutUserId);
         clearSocialAccountState(signedOutUserId);
       }

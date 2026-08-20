@@ -7,7 +7,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { getBackAction } from '@/features/navigation/navigation-utils';
 import { canScheduleGeneratedVideo, clearGeneratedVideoState } from '@/features/publishing/publishing-workflow';
-import { getSavedPublishingTargets } from '@/features/social-accounts/social-accounts';
+import { getSavedPublishingPlatforms, getSavedPublishingTargets } from '@/features/social-accounts/social-accounts';
 import { clearSchedulingDraft, getSchedulingDraft, SchedulingConflictError, schedulePost } from '@/features/scheduling/scheduling-service';
 import { buildCalendarDays, buildZonedScheduledDate, formatScheduleSummary, getDefaultSchedule, getLocalTimezone, getTimezoneLabel, type Meridiem, validateSchedule } from '@/features/scheduling/schedule-utils';
 
@@ -37,7 +37,7 @@ export default function SchedulePostPage() {
   const hasValidDraft = Boolean(draft && (draft.action !== 'create' || (user?.id && canScheduleGeneratedVideo(user.id, draft.postId, selectedAccountIds))));
   const localZone = TIMEZONES[0];
   const now = new Date();
-  const [defaultSchedule] = useState(() => getDefaultSchedule(now));
+  const [defaultSchedule] = useState(() => getDefaultSchedule(localZone.id, now));
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(defaultSchedule.date.getFullYear(), defaultSchedule.date.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultSchedule.date);
   const [hour, setHour] = useState(defaultSchedule.hour);
@@ -74,9 +74,23 @@ export default function SchedulePostPage() {
     if (validation || !scheduledAt || submitting || !user?.id) return;
     setSubmitting(true); setError('');
     try {
-      await schedulePost({ userId: user.id, accountIds: selectedAccountIds, postId: draft?.postId ?? '', scheduledAt: scheduledAt.toISOString(), timezone: timezone.id, action: draft?.action });
+      await schedulePost({
+        userId: user.id,
+        accountIds: selectedAccountIds,
+        postId: draft?.postId ?? '',
+        scheduledAt: scheduledAt.toISOString(),
+        timezone: timezone.id,
+        action: draft?.action,
+        content: draft?.action === 'create' ? {
+          title: 'Generated Video',
+          duration: '0:30',
+          platforms: getSavedPublishingPlatforms(user.id),
+          status: 'ready',
+          thumbnail: 'runner',
+        } : undefined,
+      });
       if (draft?.action === 'create') clearGeneratedVideoState(user.id);
-      clearSchedulingDraft();
+      clearSchedulingDraft(user.id);
       setSuccess(true);
     } catch (cause) {
       setError(cause instanceof SchedulingConflictError ? cause.message : cause instanceof Error ? cause.message : 'The post could not be scheduled. Please try again.');

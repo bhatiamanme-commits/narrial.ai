@@ -1,27 +1,46 @@
+import type { SocialPlatformId } from '@/features/social-accounts/social-accounts';
+
 export type SchedulingAction = 'create' | 'reschedule' | 'duplicate';
-export type ScheduleRequest = { userId: string; accountIds: string[]; postId: string; scheduledAt: string; timezone: string; action?: SchedulingAction };
+export type ScheduledPostContent = {
+  title: string;
+  duration: string;
+  platforms: SocialPlatformId[];
+  status: 'ready' | 'needs-approval';
+  thumbnail: 'summit' | 'discipline' | 'runner';
+  reviewMessage?: string;
+};
+export type ScheduleRequest = { userId: string; accountIds: string[]; postId: string; scheduledAt: string; timezone: string; action?: SchedulingAction; content?: ScheduledPostContent };
 export type ScheduledPost = ScheduleRequest & { id: string; status: 'scheduled' };
 export type SchedulingDraft = { userId: string; postId: string; action: SchedulingAction };
 
 export class SchedulingConflictError extends Error {}
 
 const scheduledOperations = new Map<string, ScheduledPost>();
-let activeDraft: SchedulingDraft | null = null;
+const schedulingDrafts = new Map<string, SchedulingDraft>();
 
 export function startSchedulingDraft(userId: string, postId: string, action: SchedulingAction = 'create'): void {
-  activeDraft = { userId, postId, action };
+  schedulingDrafts.set(userId, { userId, postId, action });
 }
 
 export function getSchedulingDraft(userId: string): SchedulingDraft | null {
-  return activeDraft?.userId === userId ? { ...activeDraft } : null;
+  const draft = schedulingDrafts.get(userId);
+  return draft ? { ...draft } : null;
 }
 
-export function clearSchedulingDraft(): void {
-  activeDraft = null;
+export function clearSchedulingDraft(userId: string): void {
+  schedulingDrafts.delete(userId);
+}
+
+export function clearAllSchedulingDrafts(): void {
+  schedulingDrafts.clear();
 }
 
 export function getScheduledPosts(userId: string): ScheduledPost[] {
-  return [...scheduledOperations.values()].filter((post) => post.userId === userId).map((post) => ({ ...post, accountIds: [...post.accountIds] }));
+  return [...scheduledOperations.values()].filter((post) => post.userId === userId).map((post) => ({
+    ...post,
+    accountIds: [...post.accountIds],
+    content: post.content ? { ...post.content, platforms: [...post.content.platforms] } : undefined,
+  }));
 }
 
 const wait = (duration: number) => new Promise((resolve) => setTimeout(resolve, duration));
@@ -38,17 +57,25 @@ function isSupportedTimezone(timezone: string): boolean {
 
 // Replace this boundary with the publishing API; the screen owns no transport details.
 export async function schedulePost(request: ScheduleRequest): Promise<ScheduledPost> {
+  const action = request.action ?? 'create';
   if (typeof request.postId !== 'string' || !request.postId.trim()) throw new Error('Choose a post to schedule.');
   if (typeof request.scheduledAt !== 'string') throw new Error('Choose a valid schedule time.');
   const scheduledTime = Date.parse(request.scheduledAt);
   if (!Number.isFinite(scheduledTime)) throw new Error('Choose a valid schedule time.');
   if (scheduledTime <= Date.now()) throw new Error('Choose a time in the future.');
   if (typeof request.timezone !== 'string' || !isSupportedTimezone(request.timezone)) throw new Error('Choose a supported time zone.');
+  if (action === 'create' && !request.content) throw new Error('Generated video details are required.');
   await wait(700);
   if (!request.userId || !request.accountIds.length) throw new Error('Your publishing selection is incomplete. Go back and choose an account.');
   const key = `${request.userId}:${request.postId}:${request.scheduledAt}`;
   if (scheduledOperations.has(key)) throw new SchedulingConflictError('This post is already scheduled for that time. Choose another time.');
-  const result: ScheduledPost = { ...request, action: request.action ?? 'create', id: `schedule-${Date.now()}`, status: 'scheduled' };
+  const result: ScheduledPost = {
+    ...request,
+    action,
+    content: request.content ? { ...request.content, platforms: [...request.content.platforms] } : undefined,
+    id: `schedule-${encodeURIComponent(key)}`,
+    status: 'scheduled',
+  };
   scheduledOperations.set(key, result);
   return result;
 }

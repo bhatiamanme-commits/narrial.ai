@@ -1,8 +1,9 @@
 export type Meridiem = 'AM' | 'PM';
 export type TimezoneOption = { id: string; name: string };
 
-export function getDefaultSchedule(now = new Date()): { date: Date; hour: string; minute: string; meridiem: Meridiem } {
-  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+export function getDefaultSchedule(timeZone: string, now = new Date()): { date: Date; hour: string; minute: string; meridiem: Meridiem } {
+  const selectedDate = getDateTimeParts(now, timeZone);
+  const date = new Date(selectedDate.year, selectedDate.month - 1, selectedDate.day + 1);
   return { date, hour: '10', minute: '30', meridiem: 'PM' };
 }
 

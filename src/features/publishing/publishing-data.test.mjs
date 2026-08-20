@@ -2,6 +2,44 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyScheduledOperations, filterPublishedPosts, getContentPerformance, PUBLISHING_WEEK } from './publishing-data.ts';
+import { getScheduledPosts, schedulePost } from '../scheduling/scheduling-service.ts';
+
+test('scheduling generated-video-primary adds it to the publishing calendar', async () => {
+  const userId = 'generated-video-calendar-user';
+  const scheduledAt = '2099-08-21T10:00:00.000Z';
+  await schedulePost({
+    userId,
+    accountIds: ['instagram-primary'],
+    postId: 'generated-video-primary',
+    scheduledAt,
+    timezone: 'UTC',
+    content: {
+      title: 'Generated Video',
+      duration: '0:30',
+      platforms: ['instagram'],
+      status: 'ready',
+      thumbnail: 'runner',
+    },
+  });
+
+  const instant = new Date(scheduledAt);
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(instant).toUpperCase();
+  const date = Number(new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: 'UTC' }).format(instant));
+  const calendar = applyScheduledOperations(
+    [{ id: 'destination', weekday, date, hasPosts: false, posts: [] }],
+    getScheduledPosts(userId),
+  );
+
+  assert.deepEqual(calendar[0].posts, [{
+    id: 'generated-video-primary',
+    title: 'Generated Video',
+    time: '10:00 AM',
+    duration: '0:30',
+    platforms: ['instagram'],
+    status: 'ready',
+    thumbnail: 'runner',
+  }]);
+});
 
 test('reschedule moves a dashboard post and duplicate adds a persisted copy', () => {
   const operations = [

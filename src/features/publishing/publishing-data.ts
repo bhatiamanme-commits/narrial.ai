@@ -70,18 +70,28 @@ export function applyScheduledOperations(week: PublishingDay[], operations: Pers
   const next = week.map((day) => ({ ...day, posts: day.posts.map((post) => ({ ...post, platforms: [...post.platforms] })) }));
 
   for (const operation of operations) {
-    const source = next.flatMap((day) => day.posts).find((post) => post.id === operation.postId)
-      ?? week.flatMap((day) => day.posts).find((post) => post.id === operation.postId);
-    if (!source || operation.action === 'create') continue;
-    if (operation.action === 'reschedule') {
-      for (const day of next) day.posts = day.posts.filter((post) => post.id !== operation.postId);
-    }
-
     const scheduledAt = new Date(operation.scheduledAt);
     const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: operation.timezone }).format(scheduledAt).toUpperCase();
     const date = Number(new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: operation.timezone }).format(scheduledAt));
     const destination = next.find((day) => day.weekday === weekday && day.date === date);
     if (!destination) continue;
+    if (operation.action === 'create') {
+      if (!operation.content) continue;
+      destination.posts.push({
+        id: operation.postId,
+        ...operation.content,
+        platforms: [...operation.content.platforms],
+        time: new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: operation.timezone }).format(scheduledAt),
+      });
+      continue;
+    }
+
+    const source = next.flatMap((day) => day.posts).find((post) => post.id === operation.postId)
+      ?? week.flatMap((day) => day.posts).find((post) => post.id === operation.postId);
+    if (!source) continue;
+    if (operation.action === 'reschedule') {
+      for (const day of next) day.posts = day.posts.filter((post) => post.id !== operation.postId);
+    }
     destination.posts.push({
       ...source,
       id: operation.action === 'duplicate' ? operation.id : source.id,

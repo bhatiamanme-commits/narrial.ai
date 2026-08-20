@@ -1,18 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { clearSchedulingDraft, getScheduledPosts, getSchedulingDraft, schedulePost, startSchedulingDraft } from './scheduling-service.ts';
+import { clearAllSchedulingDrafts, clearSchedulingDraft, getScheduledPosts, getSchedulingDraft, schedulePost, startSchedulingDraft } from './scheduling-service.ts';
 
 test('schedule access exists only after the generated-video publishing flow starts', () => {
-  clearSchedulingDraft();
+  clearAllSchedulingDrafts();
   assert.equal(getSchedulingDraft('user-1'), null);
 
   startSchedulingDraft('user-1', 'generated-video-primary');
+  startSchedulingDraft('user-2', 'another-generated-video');
   assert.deepEqual(getSchedulingDraft('user-1'), { userId: 'user-1', postId: 'generated-video-primary', action: 'create' });
-  assert.equal(getSchedulingDraft('user-2'), null);
+  assert.deepEqual(getSchedulingDraft('user-2'), { userId: 'user-2', postId: 'another-generated-video', action: 'create' });
 
-  clearSchedulingDraft();
+  clearSchedulingDraft('user-1');
   assert.equal(getSchedulingDraft('user-1'), null);
+  assert.deepEqual(getSchedulingDraft('user-2'), { userId: 'user-2', postId: 'another-generated-video', action: 'create' });
+  clearAllSchedulingDrafts();
+  assert.equal(getSchedulingDraft('user-2'), null);
 });
 
 test('scheduled operations retain the dashboard action and source post', async () => {
@@ -59,4 +63,19 @@ test('schedule validation rejects invalid inputs before the transport wait or pe
     new Promise((_, reject) => setTimeout(() => reject(new Error('Validation ran after the transport wait.')), 100)),
   ]);
   assert.deepEqual(getScheduledPosts('validation-user'), []);
+});
+
+test('distinct scheduled operations receive unique IDs in the same millisecond', async () => {
+  const originalNow = Date.now;
+  Date.now = () => 123456789;
+  const content = { title: 'Generated Video', duration: '0:30', platforms: ['instagram'], status: 'ready', thumbnail: 'runner' };
+  try {
+    const [first, second] = await Promise.all([
+      schedulePost({ userId: 'id-user', accountIds: ['instagram-1'], postId: 'video-1', scheduledAt: '2099-09-01T10:00:00.000Z', timezone: 'UTC', content }),
+      schedulePost({ userId: 'id-user', accountIds: ['instagram-1'], postId: 'video-2', scheduledAt: '2099-09-01T11:00:00.000Z', timezone: 'UTC', content }),
+    ]);
+    assert.notEqual(first.id, second.id);
+  } finally {
+    Date.now = originalNow;
+  }
 });

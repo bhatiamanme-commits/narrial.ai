@@ -34,11 +34,24 @@ test('formatScheduleSummary derives the local time and seasonal offset from the 
 });
 
 test('getDefaultSchedule provides a valid future time so scheduling is immediately available', () => {
-  const now = new Date(2026, 7, 21, 23, 45);
-  const value = getDefaultSchedule(now);
+  const now = new Date('2026-08-21T23:45:00.000Z');
+  const value = getDefaultSchedule('UTC', now);
   assert.equal(value.date.getDate(), 22);
   assert.equal(value.hour, '10');
   assert.equal(value.minute, '30');
   assert.equal(value.meridiem, 'PM');
   assert.equal(validateSchedule(value.date, value.hour, value.minute, value.meridiem, 'UTC', now), '');
+});
+
+test('getDefaultSchedule derives tomorrow from the selected timezone calendar date', () => {
+  const now = new Date('2026-08-21T01:00:00.000Z');
+  const value = getDefaultSchedule('America/Los_Angeles', now);
+
+  assert.deepEqual(
+    [value.date.getFullYear(), value.date.getMonth(), value.date.getDate()],
+    [2026, 7, 21],
+  );
+  assert.equal(value.hour, '10');
+  assert.equal(value.minute, '30');
+  assert.equal(value.meridiem, 'PM');
 });
