@@ -6,7 +6,7 @@ import { SvgXml } from 'react-native-svg';
 type BottomActionBarProps = {
   onOpenSocialConnections: () => void;
   onOpenPublishing: () => void;
-  onOpenAiInsights: () => void;
+  onOpenVideoLibrary: () => void;
   disabled?: boolean;
 };
 
@@ -19,7 +19,7 @@ type Action = {
 const ICONS = {
   social: '<path d="M11 7.3 7.1 14m5.8-6.7 3.9 6.7M9 17h6" stroke="#9DFF00"/><circle cx="12" cy="5" r="3"/><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/>',
   publishing: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 10h18"/><circle cx="15.5" cy="15.5" r="2.5"/><path d="M15.5 14v1.7l1.1.7"/>',
-  insights: '<path d="M9 4.5a3 3 0 0 0-4 3A3.5 3.5 0 0 0 5.5 14 3 3 0 0 0 9 18.5V4.5Zm6 0a3 3 0 0 1 4 3 3.5 3.5 0 0 1-.5 6.5 3 3 0 0 1-3.5 4.5V4.5Z"/><path d="M9 8H7m2 5H6.5m8.5-5h2m-2 5h2.5M12 3v18"/><path d="m19 3 .5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5L19 3Z"/>',
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
 } as const;
 
 const supportsNativeGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
@@ -55,13 +55,13 @@ function ActionButton({ action, disabled }: { action: Action; disabled: boolean 
 export function BottomActionBar({
   onOpenSocialConnections,
   onOpenPublishing,
-  onOpenAiInsights,
+  onOpenVideoLibrary,
   disabled = false,
 }: BottomActionBarProps) {
   const actions: Action[] = [
     { label: 'Connect social media', icon: ICONS.social, onPress: onOpenSocialConnections },
     { label: 'Published and scheduled posts', icon: ICONS.publishing, onPress: onOpenPublishing },
-    { label: 'AI learning insights', icon: ICONS.insights, onPress: onOpenAiInsights },
+    { label: 'Video library', icon: ICONS.library, onPress: onOpenVideoLibrary },
   ];
 
   const content = (
