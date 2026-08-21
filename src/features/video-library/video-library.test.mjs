@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { formatVideoDuration, getLibraryCountLabel, getSelectionActionLabel } from './video-library.ts';
+import { formatCompactMetric, formatVideoDuration, getLibraryCountLabel, getSelectionActionLabel } from './video-library.ts';
 
 test('formats video durations without hardcoded labels', () => {
   assert.equal(formatVideoDuration(23), '0:23');
@@ -19,4 +19,9 @@ test('describes the selection action', () => {
   assert.equal(getSelectionActionLabel(0), 'Select videos');
   assert.equal(getSelectionActionLabel(1), 'Continue with 1 video');
   assert.equal(getSelectionActionLabel(3), 'Continue with 3 videos');
+});
+
+test('formats viral view counts for video-card discovery cues', () => {
+  assert.equal(formatCompactMetric(842000), '842K');
+  assert.equal(formatCompactMetric(2800000), '2.8M');
 });
