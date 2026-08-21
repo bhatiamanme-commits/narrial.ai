@@ -18,7 +18,7 @@ const icons = {
   check: icon('<path d="m6 12 4 4 8-9"/>', '#050505'),
   play: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z" fill="#fff"/></svg>',
   close: icon('<path d="m6 6 12 12M18 6 6 18"/>'),
-  arrow: icon('<path d="M5 12h13M13 7l5 5-5 5"/>', '#050505'),
+  arrow: icon('<path d="M5 12h13M13 7l5 5-5 5"/>', lime),
   retry: icon('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', lime),
 };
 
