@@ -11,10 +11,10 @@ import { beginVideoGeneration } from '@/features/publishing/publishing-workflow'
 
 const LIME = '#9DFF00';
 const BORDER = '#315400';
-type IconName = 'back' | 'history' | 'chevron' | 'arrow';
+type IconName = 'back' | 'library' | 'chevron' | 'arrow';
 const icons: Record<IconName, string> = {
   back: '<path d="m15 18-6-6 6-6"/>',
-  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
   chevron: '<path d="m8 10 4 4 4-4"/>',
   arrow: '<path d="M5 12h14M14 7l5 5-5 5"/>',
 };
@@ -71,7 +71,7 @@ export default function GeneratorScreen() {
         <View style={[styles.topBar, compact && styles.topBarCompact]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="back" size={compact ? 21 : 24} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={`Profile: ${email}`} onPress={() => Alert.alert('Signed-in profile', email)} style={({ pressed }) => [styles.profile, compact && styles.profileCompact, pressed && styles.pressed]}><View style={[styles.avatar, compact && styles.avatarCompact]}><Text style={styles.avatarText}>{initial}</Text></View><Text numberOfLines={1} style={styles.profileEmail}>{email}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Generation history" onPress={() => Alert.alert('Generation history', 'Your generated videos will appear here.')} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="history" size={compact ? 22 : 25} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open video library" onPress={() => router.push('/video-library')} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="library" color={LIME} size={compact ? 22 : 25} /></Pressable>
         </View>
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
