@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
 type BottomActionBarProps = {
@@ -14,6 +14,8 @@ type Action = {
   label: string;
   icon: string;
   onPress: () => void;
+  callout?: string;
+  visibleLabel?: string;
 };
 
 const ICONS = {
@@ -47,7 +49,9 @@ function ActionButton({ action, disabled }: { action: Action; disabled: boolean 
         pressed && styles.actionPressed,
         disabled && styles.actionDisabled,
       ]}>
+      {action.callout ? <View style={styles.callout}><Text style={styles.calloutText}>{action.callout}</Text></View> : null}
       <ActionIcon path={action.icon} />
+      {action.visibleLabel ? <Text style={styles.visibleLabel}>{action.visibleLabel}</Text> : null}
     </Pressable>
   );
 }
@@ -61,7 +65,7 @@ export function BottomActionBar({
   const actions: Action[] = [
     { label: 'Connect social media', icon: ICONS.social, onPress: onOpenSocialConnections },
     { label: 'Published and scheduled posts', icon: ICONS.publishing, onPress: onOpenPublishing },
-    { label: 'Video library', icon: ICONS.library, onPress: onOpenVideoLibrary },
+    { label: 'Discover viral videos', icon: ICONS.library, onPress: onOpenVideoLibrary, callout: 'VIRAL', visibleLabel: 'Discover' },
   ];
 
   const content = (
@@ -100,7 +104,7 @@ export function BottomActionBar({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    minHeight: 68,
+    minHeight: 76,
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -151,5 +155,31 @@ const styles = StyleSheet.create({
   },
   actionDisabled: {
     opacity: 0.38,
+  },
+  callout: {
+    position: 'absolute',
+    top: 3,
+    right: 7,
+    minWidth: 34,
+    minHeight: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderRadius: 8,
+    backgroundColor: '#9DFF00',
+  },
+  calloutText: {
+    color: '#050505',
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  visibleLabel: {
+    marginTop: 2,
+    color: '#C8FF75',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '800',
   },
 });
