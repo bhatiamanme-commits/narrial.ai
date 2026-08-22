@@ -11,9 +11,9 @@ import { beginVideoGeneration } from '@/features/publishing/publishing-workflow'
 
 const LIME = '#9DFF00';
 const BORDER = '#315400';
-type IconName = 'back' | 'history' | 'chevron' | 'arrow';
+type IconName = 'settings' | 'history' | 'chevron' | 'arrow';
 const icons: Record<IconName, string> = {
-  back: '<path d="m15 18-6-6 6-6"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
   chevron: '<path d="m8 10 4 4 4-4"/>',
   arrow: '<path d="M5 12h14M14 7l5 5-5 5"/>',
@@ -59,17 +59,13 @@ export default function GeneratorScreen() {
     });
   };
 
-  const goBack = () => {
-    if (router.canGoBack()) router.back();
-  };
-
   const openSocialConnections = () => router.push('/onboarding');
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={[styles.content, compact && styles.contentCompact]}>
         <View style={[styles.topBar, compact && styles.topBarCompact]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="back" size={compact ? 21 : 24} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="settings" size={compact ? 21 : 24} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={`Profile: ${email}`} onPress={() => Alert.alert('Signed-in profile', email)} style={({ pressed }) => [styles.profile, compact && styles.profileCompact, pressed && styles.pressed]}><View style={[styles.avatar, compact && styles.avatarCompact]}><Text style={styles.avatarText}>{initial}</Text></View><Text numberOfLines={1} style={styles.profileEmail}>{email}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Generation history" onPress={() => Alert.alert('Generation history', 'Your generated videos will appear here.')} style={({ pressed }) => [styles.circleButton, compact && styles.circleButtonCompact, pressed && styles.pressed]}><Icon name="history" size={compact ? 22 : 25} /></Pressable>
         </View>

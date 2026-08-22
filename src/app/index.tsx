@@ -2,7 +2,7 @@ import { useAuth, useUser } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Image, ImageBackground } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -11,6 +11,7 @@ import { AuthIcon } from '@/components/auth-components';
 import { clearGeneratedVideoState } from '@/features/publishing/publishing-workflow';
 import { clearSchedulingDraft } from '@/features/scheduling/scheduling-service';
 import { clearSocialAccountState } from '@/features/social-accounts/social-accounts';
+import { resetSubscriptionSession, shouldShowSubscriptionForSession } from '@/features/subscription/subscription-entry';
 
 const lime = '#9DFF00';
 const svgUri = (svg: string) => svg;
@@ -23,13 +24,26 @@ export default function WelcomeScreen() {
   const { user } = useUser();
   const { startHostedAuth } = useHostedAuth();
   const [pendingAction, setPendingAction] = useState<'google' | 'email' | 'sign-in' | null>(null);
+  const routedUserId = useRef<string | null>(null);
   const compact = height < 760;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      routedUserId.current = null;
+      return;
+    }
+    if (!user?.id || routedUserId.current === user.id) return;
+    routedUserId.current = user.id;
+    router.replace(shouldShowSubscriptionForSession(user.id) ? '/subscription' : '/onboarding');
+  }, [isLoaded, isSignedIn, user?.id]);
 
   const handleSignOut = async () => {
     const signedOutUserId = user?.id;
     try {
       await signOut();
       if (signedOutUserId) {
+        resetSubscriptionSession(signedOutUserId);
         clearSchedulingDraft(signedOutUserId);
         clearGeneratedVideoState(signedOutUserId);
         clearSocialAccountState(signedOutUserId);
