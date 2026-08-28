@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum YouTubeConnectionStatus {
+  UNKNOWN
+  PENDING_AUTHORIZATION
+  VERIFYING
+  CONNECTED
+  INSUFFICIENT_PERMISSION
+  RECONNECT_REQUIRED
+  DISCONNECTING
+  DISCONNECTED
+  ERROR
+}
+
+enum YouTubeCredentialStatus {
+  AVAILABLE
+  MISSING
+  EXPIRED
+  REVOKED
+  INVALID
+}
+
+enum YouTubeOAuthTransactionStatus {
+  CREATED
+  AUTHORIZATION_PENDING
+  CALLBACK_RECEIVED
+  CONSUMING
+  COMPLETED
+  DENIED
+  EXPIRED
+  FAILED
+  REPLAY_REJECTED
+}
+
+enum YouTubeIdempotencyStatus {
+  CLAIMED
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
+  OUTCOME_UNKNOWN
+  EXPIRED
+}
+
+enum YouTubeUploadStatus {
+  DRAFT
+  VALIDATING
+  READY
+  QUEUED
+  SESSION_CREATING
+  UPLOADING
+  INTERRUPTED
+  CANCELLING
+  CANCELLED
+  TRANSFERRED
+  FAILED
+  OUTCOME_UNKNOWN
+}
+
+enum YouTubePublicationStatus {
+  NOT_REQUESTED
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  RESTRICTED
+  PRIVATE
+  OUTCOME_UNKNOWN
+  DELETED
+}
+
+enum YouTubeScheduleStatus {
+  DRAFT
+  SCHEDULING
+  SCHEDULED
+  RESCHEDULING
+  CANCELLING
+  CANCELLED
+  DUE
+  EXECUTING
+  RETRY_WAIT
+  PUBLISHED
+  FAILED
+  MISSED
+  OUTCOME_UNKNOWN
+}
+
+enum YouTubeSyncStatus {
+  NOT_REQUIRED
+  DUE
+  IN_PROGRESS
+  CURRENT
+  STALE
+  RETRY_WAIT
+  BLOCKED_BY_CREDENTIALS
+  BLOCKED_BY_QUOTA
+  FAILED
+}
+
+enum YouTubeOutboxStatus {
+  PENDING
+  CLAIMED
+  PUBLISHED
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
+}
+
+model YouTubeConnection {
+  id                        String                        @id @db.Uuid
+  narrialUserId             String                        @map("narrial_user_id") @db.VarChar(255)
+  youtubeChannelId          String                        @map("youtube_channel_id") @db.VarChar(255)
+  channelTitle              String                        @map("channel_title") @db.VarChar(255)
+  channelHandle             String?                       @map("channel_handle") @db.VarChar(255)
+  channelThumbnailUrl       String?                       @map("channel_thumbnail_url")
+  status                    YouTubeConnectionStatus       @default(PENDING_AUTHORIZATION)
+  credentialStatus          YouTubeCredentialStatus       @default(MISSING) @map("credential_status")
+  lastVerifiedAt            DateTime?                     @map("last_verified_at") @db.Timestamptz(6)
+  lastProviderSyncAt        DateTime?                     @map("last_provider_sync_at") @db.Timestamptz(6)
+  reauthorizationRequiredAt DateTime?                     @map("reauthorization_required_at") @db.Timestamptz(6)
+  disconnectedAt            DateTime?                     @map("disconnected_at") @db.Timestamptz(6)
+  createdAt                 DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version                   Int                           @default(1)
+  credential                YouTubeConnectionCredential?
+  scopes                    YouTubeConnectionScope[]
+  uploads                   YouTubeUpload[]
+  publications              YouTubePublication[]
+  schedules                 YouTubeScheduledPublication[]
+
+  @@unique([narrialUserId, youtubeChannelId])
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, status, updatedAt(sort: Desc)])
+  @@index([youtubeChannelId])
+  @@index([status, lastProviderSyncAt])
+  @@index([credentialStatus, reauthorizationRequiredAt])
+  @@map("youtube_connections")
+}
+
+model YouTubeConnectionCredential {
+  connectionId            String            @id @map("connection_id") @db.Uuid
+  ciphertext              Bytes             @map("ciphertext")
+  initializationVector    Bytes             @map("initialization_vector")
+  authenticationTag       Bytes?            @map("authentication_tag")
+  keyVersion              String            @map("key_version") @db.VarChar(255)
+  credentialSchemaVersion Int               @map("credential_schema_version")
+  accessTokenExpiresAt    DateTime?         @map("access_token_expires_at") @db.Timestamptz(6)
+  hasRefreshToken         Boolean           @map("has_refresh_token")
+  lastRefreshedAt         DateTime?         @map("last_refreshed_at") @db.Timestamptz(6)
+  refreshFailureCount     Int               @default(0) @map("refresh_failure_count")
+  createdAt               DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  connection              YouTubeConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([accessTokenExpiresAt])
+  @@index([keyVersion])
+  @@index([refreshFailureCount, updatedAt])
+  @@map("youtube_connection_credentials")
+}
+
+model YouTubeConnectionScope {
+  connectionId   String            @map("connection_id") @db.Uuid
+  scope          String
+  grantedAt      DateTime          @map("granted_at") @db.Timestamptz(6)
+  lastVerifiedAt DateTime          @map("last_verified_at") @db.Timestamptz(6)
+  connection     YouTubeConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@id([connectionId, scope])
+  @@index([scope])
+  @@index([connectionId, lastVerifiedAt])
+  @@map("youtube_connection_scopes")
+}
+
+model YouTubeOAuthTransaction {
+  id                     String                        @id @db.Uuid
+  narrialUserId          String                        @map("narrial_user_id") @db.VarChar(255)
+  stateHash              Bytes                         @unique @map("state_hash")
+  status                 YouTubeOAuthTransactionStatus @default(CREATED)
+  returnDestination      String                        @map("return_destination") @db.VarChar(255)
+  requestedScopes        Json                          @map("requested_scopes")
+  pkceVerifierCiphertext Bytes?                        @map("pkce_verifier_ciphertext")
+  pkceKeyVersion         String?                       @map("pkce_key_version") @db.VarChar(255)
+  expiresAt              DateTime                      @map("expires_at") @db.Timestamptz(6)
+  consumedAt             DateTime?                     @map("consumed_at") @db.Timestamptz(6)
+  failureCategory        String?                       @map("failure_category") @db.VarChar(255)
+  createdAt              DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("youtube_oauth_transactions")
+}
+
+model YouTubeStatusEvent {
+  id            String   @id @db.Uuid
+  narrialUserId String   @map("narrial_user_id") @db.VarChar(255)
+  aggregateType String   @map("aggregate_type") @db.VarChar(100)
+  aggregateId   String   @map("aggregate_id") @db.Uuid
+  fromStatus    String?  @map("from_status") @db.VarChar(100)
+  toStatus      String   @map("to_status") @db.VarChar(100)
+  reason        String?  @db.VarChar(255)
+  source        String   @db.VarChar(100)
+  requestId     String?  @map("request_id") @db.VarChar(255)
+  jobId         String?  @map("job_id") @db.Uuid
+  safeMetadata  Json?    @map("safe_metadata")
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([narrialUserId, occurredAt(sort: Desc)])
+  @@index([aggregateType, aggregateId, occurredAt])
+  @@map("youtube_status_events")
+}
+
+model YouTubeAuditEvent {
+  id            String   @id @db.Uuid
+  narrialUserId String   @map("narrial_user_id") @db.VarChar(255)
+  actorType     String   @map("actor_type") @db.VarChar(100)
+  actorId       String?  @map("actor_id") @db.VarChar(255)
+  eventType     String   @map("event_type") @db.VarChar(100)
+  targetType    String   @map("target_type") @db.VarChar(100)
+  targetId      String   @map("target_id") @db.Uuid
+  outcome       String   @db.VarChar(100)
+  requestId     String?  @map("request_id") @db.VarChar(255)
+  safeMetadata  Json?    @map("safe_metadata")
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([narrialUserId, occurredAt(sort: Desc)])
+  @@index([targetType, targetId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@map("youtube_audit_events")
+}
+
+model YouTubeVideoSource {
+  id               String          @id @db.Uuid
+  narrialUserId    String          @map("narrial_user_id") @db.VarChar(255)
+  storageObjectKey String          @map("storage_object_key") @db.VarChar(512)
+  originalFilename String          @map("original_filename") @db.VarChar(255)
+  mimeType         String          @map("mime_type") @db.VarChar(255)
+  byteSize         BigInt          @map("byte_size")
+  checksumSha256   Bytes           @map("checksum_sha256")
+  status           String          @db.VarChar(50)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version          Int             @default(1)
+  uploads          YouTubeUpload[]
+
+  @@unique([narrialUserId, storageObjectKey])
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@map("youtube_video_sources")
+}
+
+model YouTubeUpload {
+  id             String              @id @db.Uuid
+  narrialUserId  String              @map("narrial_user_id") @db.VarChar(255)
+  connectionId   String              @map("connection_id") @db.Uuid
+  videoSourceId  String              @map("video_source_id") @db.Uuid
+  youtubeVideoId String?             @map("youtube_video_id") @db.VarChar(255)
+  status         YouTubeUploadStatus @default(QUEUED)
+  bytesUploaded  BigInt              @default(0) @map("bytes_uploaded")
+  totalBytes     BigInt              @map("total_bytes")
+  attemptCount   Int                 @default(0) @map("attempt_count")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int                 @default(1)
+  connection     YouTubeConnection   @relation(fields: [connectionId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+  source         YouTubeVideoSource  @relation(fields: [videoSourceId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+  publication    YouTubePublication?
+
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@index([connectionId, status, createdAt(sort: Desc)])
+  @@map("youtube_uploads")
+}
+
+model YouTubePublication {
+  id             String                       @id @db.Uuid
+  narrialUserId  String                       @map("narrial_user_id") @db.VarChar(255)
+  connectionId   String                       @map("connection_id") @db.Uuid
+  uploadId       String                       @unique @map("upload_id") @db.Uuid
+  youtubeVideoId String?                      @map("youtube_video_id") @db.VarChar(255)
+  title          String                       @db.VarChar(255)
+  description    String
+  privacyStatus  String                       @map("privacy_status") @db.VarChar(50)
+  status         YouTubePublicationStatus     @default(NOT_REQUESTED)
+  createdAt      DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int                          @default(1)
+  connection     YouTubeConnection            @relation(fields: [connectionId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+  upload         YouTubeUpload                @relation(fields: [uploadId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+  schedule       YouTubeScheduledPublication?
+  syncRecord     YouTubeVideoSyncRecord?
+
+  @@unique([id, narrialUserId])
+  @@unique([uploadId, narrialUserId])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@map("youtube_publications")
+}
+
+model YouTubeScheduledPublication {
+  id              String                @id @db.Uuid
+  narrialUserId   String                @map("narrial_user_id") @db.VarChar(255)
+  connectionId    String                @map("connection_id") @db.Uuid
+  publicationId   String                @unique @map("publication_id") @db.Uuid
+  scheduledAtUtc  DateTime              @map("scheduled_at_utc") @db.Timestamptz(6)
+  displayTimezone String                @map("display_timezone") @db.VarChar(255)
+  status          YouTubeScheduleStatus @default(SCHEDULED)
+  attemptCount    Int                   @default(0) @map("attempt_count")
+  claimedAt       DateTime?             @map("claimed_at") @db.Timestamptz(6)
+  claimOwner      String?               @map("claim_owner") @db.VarChar(255)
+  claimExpiresAt  DateTime?             @map("claim_expires_at") @db.Timestamptz(6)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version         Int                   @default(1)
+  connection      YouTubeConnection     @relation(fields: [connectionId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+  publication     YouTubePublication    @relation(fields: [publicationId, narrialUserId], references: [id, narrialUserId], onDelete: Restrict)
+
+  @@unique([publicationId, narrialUserId])
+  @@index([status, scheduledAtUtc])
+  @@index([narrialUserId, status, scheduledAtUtc])
+  @@map("youtube_scheduled_publications")
+}
+
+model YouTubeVideoSyncRecord {
+  id                      String             @id @db.Uuid
+  narrialUserId           String             @map("narrial_user_id") @db.VarChar(255)
+  publicationId           String             @unique @map("publication_id") @db.Uuid
+  youtubeVideoId          String             @map("youtube_video_id") @db.VarChar(255)
+  status                  YouTubeSyncStatus  @default(DUE)
+  nextSyncAt              DateTime           @map("next_sync_at") @db.Timestamptz(6)
+  consecutiveFailureCount Int                @default(0) @map("consecutive_failure_count")
+  createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version                 Int                @default(1)
+  publication             YouTubePublication @relation(fields: [publicationId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
+
+  @@unique([publicationId, narrialUserId])
+  @@index([status, nextSyncAt])
+  @@index([narrialUserId, updatedAt(sort: Desc)])
+  @@map("youtube_video_sync_records")
+}
+
+model YouTubeIdempotencyRecord {
+  id                 String                   @id @db.Uuid
+  narrialUserId      String                   @map("narrial_user_id") @db.VarChar(255)
+  operationType      String                   @map("operation_type") @db.VarChar(100)
+  idempotencyKeyHash Bytes                    @map("idempotency_key_hash")
+  requestHash        Bytes                    @map("request_hash")
+  status             YouTubeIdempotencyStatus @default(CLAIMED)
+  resourceType       String?                  @map("resource_type") @db.VarChar(100)
+  resourceId         String?                  @map("resource_id") @db.Uuid
+  safeResponse       Json?                    @map("safe_response")
+  expiresAt          DateTime                 @map("expires_at") @db.Timestamptz(6)
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([narrialUserId, operationType, idempotencyKeyHash])
+  @@index([status, expiresAt])
+  @@map("youtube_idempotency_records")
+}
+
+model YouTubeOutboxEvent {
+  id             String              @id @db.Uuid
+  narrialUserId  String              @map("narrial_user_id") @db.VarChar(255)
+  eventType      String              @map("event_type") @db.VarChar(100)
+  aggregateType  String              @map("aggregate_type") @db.VarChar(100)
+  aggregateId    String              @map("aggregate_id") @db.Uuid
+  payloadVersion Int                 @map("payload_version")
+  safePayload    Json                @map("safe_payload")
+  status         YouTubeOutboxStatus @default(PENDING)
+  availableAt    DateTime            @default(now()) @map("available_at") @db.Timestamptz(6)
+  attemptCount   Int                 @default(0) @map("attempt_count")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, availableAt])
+  @@index([narrialUserId, status])
+  @@map("youtube_outbox_events")
+}
