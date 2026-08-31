@@ -63,9 +63,7 @@ export default function ConnectSocialAccountsPage() {
         return;
       }
       setPlatforms((current) => current.map((item) => item.id === platform.id ? { ...item, connected: connection.connected, verified: connection.verified } : item));
-      setMessage(`${platform.name} connected successfully.`);
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      router.replace(continueDestination);
+      setMessage(`${platform.name} connected successfully. Connect another account or press Continue.`);
     } catch {
       setMessage(`Could not connect ${platform.name}. Please try again.`);
     } finally {

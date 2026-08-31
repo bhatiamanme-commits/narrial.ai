@@ -62,8 +62,7 @@ export default function ChooseAccountsPage() {
       const saved = getSavedPublishingTargets(user.id).filter((id) => validIds.has(id));
       setAccounts(nextAccounts);
       setSelectedIds(saved.length ? saved : [validAccounts[0].id]);
-      setMessage(`${nextAccounts.length} connected ${nextAccounts.length === 1 ? 'account' : 'accounts'} available.`);
-    } catch {
+      setMessage(`${validAccounts.length} connected ${validAccounts.length === 1 ? 'account' : 'accounts'} available.`);    } catch {
       if (generation !== loadGeneration.current) return;
       setError('We couldn’t load your accounts. Check your internet connection and try again.');
       setMessage('Connected accounts could not be loaded.');
@@ -103,9 +102,8 @@ export default function ChooseAccountsPage() {
   };
 
   if (!isLoaded || !publishingVideo) {
-    return <SafeAreaView style={styles.screen}><View style={styles.guardLoading}><ActivityIndicator accessibilityLabel="Opening video generator" color={LIME}/></View></SafeAreaView>;
+    return <SafeAreaView style={styles.screen}><View style={styles.guardLoading}><ActivityIndicator accessibilityLabel="Loading" color={LIME}/></View></SafeAreaView>;
   }
-
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}><View style={styles.page}>
     <View style={styles.topBar}><Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="back"/></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Account options" accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(true)} style={({ pressed }) => [styles.circleButton, pressed && styles.pressed]}><Icon name="more"/></Pressable></View>
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
