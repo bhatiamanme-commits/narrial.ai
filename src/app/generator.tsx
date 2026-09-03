@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
 import { BottomActionBar } from '@/components/bottom-action-bar';
-import { ReferenceInput, VideoReference } from '@/components/reference-input';
+import { ReferenceInput } from '@/components/reference-input';
+import { MediaReference } from '@/features/media-reference/media-reference';
 import { beginVideoGeneration } from '@/features/publishing/publishing-workflow';
 
 const LIME = '#9DFF00';
@@ -35,7 +36,7 @@ export default function GeneratorScreen() {
   const [videoCount, setVideoCount] = useState('3 videos');
   const [aspectRatio, setAspectRatio] = useState('9:16');
   const [openPicker, setOpenPicker] = useState<'count' | 'ratio' | null>(null);
-  const [reference, setReference] = useState<VideoReference | null>(null);
+  const [reference, setReference] = useState<MediaReference | null>(null);
   const compact = height / width <= 1.85;
   const email = user?.primaryEmailAddress?.emailAddress ?? 'Signed-in profile';
   const initial = useMemo(() => email.charAt(0).toUpperCase(), [email]);
@@ -52,8 +53,9 @@ export default function GeneratorScreen() {
         ...(reference ? {
           referenceName: reference.name,
           referenceSource: reference.source,
-          referenceThumbnailSource: reference.thumbnailSource,
+          ...(reference.thumbnailSource ? { referenceThumbnailSource: reference.thumbnailSource } : {}),
           referenceType: reference.type,
+          referenceMediaType: reference.mediaType,
         } : {}),
       },
     });

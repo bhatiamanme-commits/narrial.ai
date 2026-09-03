@@ -1,22 +1,15 @@
 import * as Clipboard from 'expo-clipboard';
-import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { getReferenceLinkDetails, MediaReference, normalizeReferenceUrl } from '@/features/media-reference/media-reference';
 
 const LIME = '#B6FF2E';
 
-export type VideoReference =
-  | { type: 'file'; source: string; thumbnailSource: string; name: string; mimeType?: string; size?: number }
-  | { type: 'url'; source: string; thumbnailSource: string; name: string };
-
 export function isValidVideoUrl(value: string) {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === 'https:' || url.protocol === 'http:';
-  } catch {
-    return false;
-  }
+  return normalizeReferenceUrl(value) !== null;
 }
 
 function SheetOption({ title, description, symbol, onPress }: { title: string; description: string; symbol: string; onPress: () => void }) {
@@ -29,55 +22,84 @@ function SheetOption({ title, description, symbol, onPress }: { title: string; d
   );
 }
 
-export function ReferenceInput({ value, onChange }: { value: VideoReference | null; onChange: (reference: VideoReference | null) => void }) {
+export function ReferenceInput({ value, onChange }: { value: MediaReference | null; onChange: (reference: MediaReference | null) => void }) {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [urlVisible, setUrlVisible] = useState(false);
   const [url, setUrl] = useState('');
   const [clipboardUrl, setClipboardUrl] = useState('');
   const [error, setError] = useState('');
   const [pickerError, setPickerError] = useState('');
+  const [addingLink, setAddingLink] = useState(false);
 
-  useEffect(() => {
-    if (!urlVisible) return;
+  const openUrlPanel = () => {
     setError('');
     setUrl(value?.type === 'url' ? value.source : '');
     Clipboard.getStringAsync().then((text) => setClipboardUrl(isValidVideoUrl(text) ? text.trim() : '')).catch(() => setClipboardUrl(''));
-  }, [urlVisible, value]);
+    setSheetVisible(false);
+    setUrlVisible(true);
+  };
 
-  const uploadVideo = async () => {
+  const chooseFromGallery = async () => {
     setSheetVisible(false);
     setPickerError('');
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'video/*', copyToCacheDirectory: true, multiple: false });
+      if (Platform.OS === 'ios') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setPickerError('Allow photo library access to choose a photo or video.');
+          setSheetVisible(true);
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: false,
+        quality: 1,
+      });
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        const thumbnail = await VideoThumbnails.getThumbnailAsync(asset.uri);
-        onChange({ type: 'file', source: asset.uri, thumbnailSource: thumbnail.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
+        const mediaType = asset.type === 'video' ? 'video' : 'image';
+        let thumbnailSource = asset.uri;
+        if (mediaType === 'video') {
+          try {
+            thumbnailSource = (await VideoThumbnails.getThumbnailAsync(asset.uri)).uri;
+          } catch {
+            thumbnailSource = '';
+          }
+        }
+        onChange({
+          type: 'file',
+          mediaType,
+          source: asset.uri,
+          thumbnailSource: thumbnailSource || undefined,
+          name: asset.fileName ?? `Selected ${mediaType}`,
+          mimeType: asset.mimeType,
+          size: asset.fileSize,
+        });
       }
     } catch {
-      setPickerError('Unable to prepare that video preview. Please try again.');
+      setPickerError('Unable to open your gallery. Please try again.');
       setSheetVisible(true);
     }
   };
 
   const addUrl = async () => {
-    const normalized = url.trim();
-    if (!isValidVideoUrl(normalized)) {
+    const normalized = normalizeReferenceUrl(url);
+    if (!normalized) {
       setError('Enter a valid video URL beginning with http:// or https://.');
       return;
     }
-    try {
-      const thumbnail = await VideoThumbnails.getThumbnailAsync(normalized);
-      onChange({ type: 'url', source: normalized, thumbnailSource: thumbnail.uri, name: 'Video link added' });
-      setUrlVisible(false);
-    } catch {
-      setError('Unable to create a preview from this video URL. Check the link and try again.');
-    }
+    setAddingLink(true);
+    const details = getReferenceLinkDetails(normalized);
+    onChange({ type: 'url', mediaType: 'video', source: normalized, ...details });
+    setAddingLink(false);
+    setUrlVisible(false);
   };
 
   return (
     <>
-      <Pressable accessibilityRole="button" accessibilityLabel={value ? `Reference attached: ${value.name}. Tap to change or remove.` : 'Add a reference video or video link'} onPress={() => { setPickerError(''); setSheetVisible(true); }} style={({ pressed }) => [styles.cardContent, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={value ? `Reference attached: ${value.name}. Tap to change or remove.` : 'Add a reference photo, video, or video link'} onPress={() => { setPickerError(''); setSheetVisible(true); }} style={({ pressed }) => [styles.cardContent, pressed && styles.pressed]}>
         <Text style={styles.cardTitle}>Reference</Text>
         <View style={styles.cardBottom}><Text numberOfLines={1} style={[styles.cardValue, value && styles.cardValueSelected]}>{value?.name ?? 'Add Files'}</Text><Text style={styles.plus}>{value ? '•••' : '+'}</Text></View>
       </Pressable>
@@ -89,11 +111,11 @@ export function ReferenceInput({ value, onChange }: { value: VideoReference | nu
             <Text accessibilityRole="header" style={styles.sheetTitle}>{value ? 'Change Reference' : 'Add Reference'}</Text>
             <Text style={styles.sheetSubtitle}>Choose how you want to add your reference.</Text>
             {pickerError ? <Text accessibilityRole="alert" style={[styles.error, styles.pickerError]}>{pickerError}</Text> : null}
-            <SheetOption title={pickerError ? 'Try upload again' : 'Upload a video'} description="Choose a file from your device" symbol="↑" onPress={async () => {
+            <SheetOption title={pickerError ? 'Try gallery again' : 'Choose from gallery'} description="Select a photo or video from your device" symbol="↑" onPress={async () => {
               setSheetVisible(false);
-              await uploadVideo();
+              await chooseFromGallery();
             }} />
-            <SheetOption title="Paste a video link" description="Use a URL from the web" symbol="⌁" onPress={() => { setSheetVisible(false); setUrlVisible(true); }} />
+            <SheetOption title="Paste a video link" description="Use a URL from the web" symbol="⌁" onPress={openUrlPanel} />
             {value ? <Pressable accessibilityRole="button" onPress={() => { onChange(null); setSheetVisible(false); }} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}><Text style={styles.removeText}>Remove reference</Text></Pressable> : null}
           </Pressable>
         </Pressable>
@@ -107,7 +129,7 @@ export function ReferenceInput({ value, onChange }: { value: VideoReference | nu
               {clipboardUrl && clipboardUrl !== url ? <Pressable accessibilityRole="button" onPress={() => { setUrl(clipboardUrl); setError(''); }} style={({ pressed }) => [styles.clipboardButton, pressed && styles.pressed]}><Text numberOfLines={1} style={styles.clipboardText}>Paste from clipboard</Text></Pressable> : null}
               <View style={[styles.urlInputWrap, error ? styles.urlInputError : null]}><TextInput autoFocus autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="done" value={url} onChangeText={(text) => { setUrl(text); setError(''); }} onSubmitEditing={addUrl} placeholder="https://" placeholderTextColor="#666666" style={styles.urlInput} />{url ? <Pressable accessibilityRole="button" accessibilityLabel="Clear URL" onPress={() => { setUrl(''); setError(''); }} style={styles.clearButton}><Text style={styles.clearText}>×</Text></Pressable> : null}</View>
               {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-              <Pressable accessibilityRole="button" disabled={!url.trim()} onPress={addUrl} style={({ pressed }) => [styles.addButton, !url.trim() && styles.disabled, pressed && styles.pressed]}><Text style={styles.addText}>Add Link</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={!url.trim() || addingLink} onPress={addUrl} style={({ pressed }) => [styles.addButton, (!url.trim() || addingLink) && styles.disabled, pressed && styles.pressed]}>{addingLink ? <ActivityIndicator color="#000000" /> : <Text style={styles.addText}>Add Link</Text>}</Pressable>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>

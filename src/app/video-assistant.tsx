@@ -6,6 +6,7 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -20,6 +21,7 @@ import { SvgXml } from 'react-native-svg';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
+import { MediaReference } from '@/features/media-reference/media-reference';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
@@ -36,8 +38,7 @@ const QUESTIONS: Question[] = [
 ];
 
 type Answer = { option?: string; custom?: string; skipped?: boolean };
-type VideoReference = { name: string; source: string; thumbnailSource: string; type: 'file' | 'url' };
-type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: VideoReference };
+type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: MediaReference };
 type State = { index: number; answers: Record<string, Answer>; complete: boolean; generation: GenerationInput };
 type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'close' };
 
@@ -76,18 +77,26 @@ function RobotThumbnail() {
   </View>;
 }
 
-function UploadedVideoCard({ reference }: { reference: VideoReference }) {
+function UploadedMediaCard({ reference }: { reference: MediaReference }) {
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
-  useEffect(() => setThumbnailFailed(false), [reference.thumbnailSource]);
+  const hasThumbnail = Boolean(reference.thumbnailSource) && !thumbnailFailed;
+  const isVideo = reference.mediaType === 'video';
+  const openPreview = () => {
+    if (reference.type === 'url') {
+      void Linking.openURL(reference.source);
+      return;
+    }
+    void AccessibilityInfo.announceForAccessibility(`${reference.mediaType} reference selected.`);
+  };
 
   return <View style={styles.uploadWrap}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${reference.name}`} onPress={() => AccessibilityInfo.announceForAccessibility('Video preview opened in demo mode.')} style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]}>
-      {thumbnailFailed
-        ? <RobotThumbnail />
-        : <Image source={{ uri: reference.thumbnailSource }} resizeMode="cover" onError={() => setThumbnailFailed(true)} style={styles.videoThumbnail} />}
+    <Pressable accessibilityRole="button" accessibilityLabel={`${reference.type === 'url' ? 'Open' : 'Preview'} ${reference.name}`} onPress={openPreview} style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]}>
+      {hasThumbnail
+        ? <Image source={{ uri: reference.thumbnailSource }} resizeMode="cover" onError={() => setThumbnailFailed(true)} style={styles.videoThumbnail} />
+        : <RobotThumbnail />}
       <View style={styles.videoShade} />
-      <View style={styles.playButton}><Icon name="play" size={25} /></View>
+      {isVideo ? <View style={styles.playButton}><Icon name="play" size={25} /></View> : null}
       <View style={styles.videoMeta}><Text numberOfLines={1} style={styles.videoName}>{reference.name}</Text></View>
     </Pressable>
     <View style={styles.delivered}><Icon name="check" color="#000" size={15} /></View>
@@ -158,15 +167,15 @@ function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: Sta
 
 export default function VideoAssistantScreen() {
   const { user } = useUser();
-  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
+  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; referenceMediaType?: 'image' | 'video'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
   const composerRef = useRef<TextInput>(null);
   const [percentage, setPercentage] = useState(8);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
-  const reference = params.referenceName && params.referenceSource && params.referenceThumbnailSource && (params.referenceType === 'file' || params.referenceType === 'url')
-    ? { name: params.referenceName, source: params.referenceSource, thumbnailSource: params.referenceThumbnailSource, type: params.referenceType }
+  const reference = params.referenceName && params.referenceSource && (params.referenceType === 'file' || params.referenceType === 'url')
+    ? { name: params.referenceName, source: params.referenceSource, thumbnailSource: params.referenceThumbnailSource, type: params.referenceType, mediaType: params.referenceMediaType === 'image' ? 'image' as const : 'video' as const }
     : undefined;
   const [state, dispatch] = useReducer(reducer, {
     index: 0,
@@ -228,7 +237,7 @@ export default function VideoAssistantScreen() {
       <View style={[styles.content, { maxWidth: Math.min(620, width) }, compact && styles.contentCompact]}>
         <ScrollView style={styles.conversationScroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
-            {state.generation.reference ? <UploadedVideoCard reference={state.generation.reference} /> : null}
+            {state.generation.reference ? <UploadedMediaCard reference={state.generation.reference} /> : null}
             <AnalysisStatus percentage={percentage} />
             {percentage >= 100 ? <GeneratedVideoCard /> : null}
             {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
