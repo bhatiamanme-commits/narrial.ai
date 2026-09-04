@@ -112,6 +112,23 @@ export async function connectSocialAccount(userId: string, platformId: SocialPla
   return { connected: true, verified: true, account: { ...account } };
 }
 
+export function recordYouTubeConnection(userId: string, connection: { id: string; channel: { title: string }; status: 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED' }): { connected: boolean; verified: boolean; account: SocialAccount } {
+  const state = getUserState(userId);
+  const connected = connection.status === 'CONNECTED';
+  const account: SocialAccount = {
+    id: connection.id,
+    platform: 'youtube',
+    displayName: connection.channel.title,
+    username: 'YouTube channel',
+    connectionStatus: connected ? 'connected' : connection.status === 'RECONNECT_REQUIRED' ? 'expired' : 'disconnected',
+    tokenStatus: connected ? 'valid' : 'expired',
+    verificationStatus: connected ? 'verified' : 'failed',
+  };
+  state.connectedAccounts = [...state.connectedAccounts.filter((item) => item.platform !== 'youtube'), account];
+  if (connected) state.selectedPublishingTargets = [...new Set([...state.selectedPublishingTargets, account.id])];
+  return { connected, verified: connected, account: { ...account } };
+}
+
 export async function disconnectAllSocialAccounts(userId: string): Promise<void> {
   const operationVersion = beginSocialAccountMutation(userId);
   await wait(250);

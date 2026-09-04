@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 const ALGORITHM = 'aes-256-gcm';
 const PUBLIC_ALGORITHM = 'AES-256-GCM' as const;
 const KEY_VERSION = /^(local|test)-v[1-9]\d*$/;
+const PRODUCTION_KEY_VERSION = /^production-v[1-9]\d*$/;
 
 export interface CredentialPayload {
   credentialSchemaVersion: number;
@@ -16,7 +17,7 @@ export interface CredentialPayload {
 
 export interface CredentialContext {
   module: 'youtube';
-  environment: 'local' | 'test';
+  environment: 'local' | 'test' | 'production';
   ownerId: string;
   recordId: string;
   credentialSchemaVersion: number;
@@ -72,6 +73,28 @@ export class LocalCredentialKeyAdapter implements CredentialKeyAdapter {
     const key = this.#keys.get(version);
     if (!key) return Promise.reject(new CredentialIntegrityError());
     return Promise.resolve(Uint8Array.from(key));
+  }
+}
+
+export class ProductionCredentialKeyAdapter implements CredentialKeyAdapter {
+  readonly #activeKeyVersion: string;
+  readonly #key: Uint8Array;
+
+  constructor(input: { activeKeyVersion: string; key: Uint8Array }) {
+    if (!PRODUCTION_KEY_VERSION.test(input.activeKeyVersion) || input.key.byteLength !== 32) {
+      throw new CredentialIntegrityError();
+    }
+    this.#activeKeyVersion = input.activeKeyVersion;
+    this.#key = Uint8Array.from(input.key);
+  }
+
+  activeVersion() {
+    return Promise.resolve(this.#activeKeyVersion);
+  }
+
+  keyForVersion(version: string) {
+    if (version !== this.#activeKeyVersion) return Promise.reject(new CredentialIntegrityError());
+    return Promise.resolve(Uint8Array.from(this.#key));
   }
 }
 

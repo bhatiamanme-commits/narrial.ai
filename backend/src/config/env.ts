@@ -9,6 +9,14 @@ export interface AppConfig {
   allowedWebOrigins: string[];
   clerkPublishableKey: string;
   clerkSecretKey: string;
+  databaseUrl: string;
+  googleOAuthClientId: string;
+  googleOAuthClientSecret: string;
+  googleOAuthRedirectUri: string;
+  allowedAppReturnUrls: string[];
+  credentialEncryptionKey: string;
+  credentialEncryptionKeyVersion: string;
+  oauthStateHmacKey: string;
   requestTimeoutMs: number;
   handlerTimeoutMs: number;
   keepAliveTimeoutMs: number;
@@ -57,6 +65,39 @@ function parseOrigins(value: string | undefined) {
   return [...new Set(origins)];
 }
 
+function parseAppReturnUrls(value: string | undefined) {
+  if (!value) return undefined;
+  const destinations = value.split(',').map((destination) => destination.trim());
+  if (destinations.some((destination) => !destination || destination.includes('*'))) return undefined;
+  try {
+    const urls = destinations.map((destination) => new URL(destination));
+    if (urls.some((url) => !['https:', 'narrial:'].includes(url.protocol) || url.toString().length > 255)) {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return [...new Set(destinations)];
+}
+
+function parseHttpsUrl(value: string | undefined) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash &&
+      url.pathname === '/api/v1/youtube/oauth/callback'
+      ? value
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseEncryptionKey(value: string | undefined) {
+  if (!value || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return undefined;
+  return Buffer.from(value, 'base64').byteLength === 32 ? value : undefined;
+}
+
 export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
   const invalidFields: string[] = [];
   const nodeEnv = isOneOf(environment.NODE_ENV, nodeEnvironments)
@@ -70,6 +111,19 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
   const allowedWebOrigins = parseOrigins(environment.ALLOWED_WEB_ORIGINS);
   const clerkPublishableKey = environment.CLERK_PUBLISHABLE_KEY?.trim() || undefined;
   const clerkSecretKey = environment.CLERK_SECRET_KEY?.trim() || undefined;
+  const databaseUrl = environment.DATABASE_URL?.trim() || undefined;
+  const googleOAuthClientId = environment.GOOGLE_OAUTH_CLIENT_ID?.trim() || undefined;
+  const googleOAuthClientSecret = environment.GOOGLE_OAUTH_CLIENT_SECRET?.trim() || undefined;
+  const googleOAuthRedirectUri = parseHttpsUrl(environment.GOOGLE_OAUTH_REDIRECT_URI?.trim());
+  const allowedAppReturnUrls = parseAppReturnUrls(environment.ALLOWED_APP_RETURN_URLS);
+  const credentialEncryptionKey = parseEncryptionKey(environment.CREDENTIAL_ENCRYPTION_KEY?.trim());
+  const rawCredentialEncryptionKeyVersion = environment.CREDENTIAL_ENCRYPTION_KEY_VERSION?.trim();
+  const expectedKeyEnvironment = nodeEnv === 'production' ? 'production' : nodeEnv === 'test' ? 'test' : 'local';
+  const credentialEncryptionKeyVersion =
+    rawCredentialEncryptionKeyVersion && new RegExp(`^${expectedKeyEnvironment}-v[1-9]\\d*$`).test(rawCredentialEncryptionKeyVersion)
+      ? rawCredentialEncryptionKeyVersion
+      : undefined;
+  const oauthStateHmacKey = parseEncryptionKey(environment.OAUTH_STATE_HMAC_KEY?.trim());
   const requestTimeoutMs = parseInteger(environment.REQUEST_TIMEOUT_MS, 1, 300_000);
   const handlerTimeoutMs = parseInteger(environment.HANDLER_TIMEOUT_MS, 1, 300_000);
   const keepAliveTimeoutMs = parseInteger(environment.KEEP_ALIVE_TIMEOUT_MS, 1, 300_000);
@@ -87,6 +141,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     ALLOWED_WEB_ORIGINS: allowedWebOrigins,
     CLERK_PUBLISHABLE_KEY: clerkPublishableKey,
     CLERK_SECRET_KEY: clerkSecretKey,
+    DATABASE_URL: databaseUrl,
+    GOOGLE_OAUTH_CLIENT_ID: googleOAuthClientId,
+    GOOGLE_OAUTH_CLIENT_SECRET: googleOAuthClientSecret,
+    GOOGLE_OAUTH_REDIRECT_URI: googleOAuthRedirectUri,
+    ALLOWED_APP_RETURN_URLS: allowedAppReturnUrls,
+    CREDENTIAL_ENCRYPTION_KEY: credentialEncryptionKey,
+    CREDENTIAL_ENCRYPTION_KEY_VERSION: credentialEncryptionKeyVersion,
+    OAUTH_STATE_HMAC_KEY: oauthStateHmacKey,
     REQUEST_TIMEOUT_MS: requestTimeoutMs,
     HANDLER_TIMEOUT_MS: handlerTimeoutMs,
     KEEP_ALIVE_TIMEOUT_MS: keepAliveTimeoutMs,
@@ -107,6 +169,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     allowedWebOrigins: allowedWebOrigins!,
     clerkPublishableKey: clerkPublishableKey!,
     clerkSecretKey: clerkSecretKey!,
+    databaseUrl: databaseUrl!,
+    googleOAuthClientId: googleOAuthClientId!,
+    googleOAuthClientSecret: googleOAuthClientSecret!,
+    googleOAuthRedirectUri: googleOAuthRedirectUri!,
+    allowedAppReturnUrls: allowedAppReturnUrls!,
+    credentialEncryptionKey: credentialEncryptionKey!,
+    credentialEncryptionKeyVersion: credentialEncryptionKeyVersion!,
+    oauthStateHmacKey: oauthStateHmacKey!,
     requestTimeoutMs: requestTimeoutMs!,
     handlerTimeoutMs: handlerTimeoutMs!,
     keepAliveTimeoutMs: keepAliveTimeoutMs!,

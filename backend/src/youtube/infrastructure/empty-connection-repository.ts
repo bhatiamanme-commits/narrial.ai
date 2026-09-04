@@ -9,4 +9,8 @@ export class EmptyYouTubeConnectionRepository implements YouTubeConnectionReposi
     void userId;
     return Promise.resolve(null);
   }
+
+  listForUser(): Promise<YouTubeConnection[]> {
+    return Promise.resolve([]);
+  }
 }

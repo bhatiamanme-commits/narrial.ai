@@ -12,6 +12,7 @@ export interface YouTubeConnection {
 
 export interface YouTubeConnectionRepository {
   findByIdForUser(connectionId: string, userId: string): Promise<YouTubeConnection | null>;
+  listForUser(userId: string): Promise<YouTubeConnection[]>;
 }
 
 export interface YouTubeProvider {

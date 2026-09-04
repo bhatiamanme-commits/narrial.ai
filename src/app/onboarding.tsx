@@ -1,4 +1,5 @@
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -8,7 +9,8 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { getBackAction } from '@/features/navigation/navigation-utils';
 import { getPublishableGeneratedVideo } from '@/features/publishing/publishing-workflow';
 import { SocialAccountCard } from '@/features/social-accounts/social-account-card';
-import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, isSocialAccountValid, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
+import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, isSocialAccountValid, recordYouTubeConnection, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
+import { connectYouTubeAccount } from '@/features/social-accounts/youtube-oauth-client';
 
 const LIME = '#A8FF00';
 
@@ -24,6 +26,7 @@ function CircularIconButton({ label, icon, onPress, expanded }: CircularIconButt
 
 export default function ConnectSocialAccountsPage() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { height, width } = useWindowDimensions();
   const compact = height < 780 || width < 360;
@@ -40,7 +43,6 @@ export default function ConnectSocialAccountsPage() {
   };
 
   useEffect(() => {
-    setPlatforms(INITIAL_SOCIAL_PLATFORMS);
     if (!user?.id) return;
     let cancelled = false;
     void getConnectedSocialAccounts(user.id).then((accounts) => {
@@ -57,15 +59,23 @@ export default function ConnectSocialAccountsPage() {
     setConnectingId(platform.id);
     setMessage(`Connecting ${platform.name}.`);
     try {
-      const connection = await connectSocialAccount(user.id, platform.id);
+      const connection = platform.id === 'youtube'
+        ? recordYouTubeConnection(user.id, await connectYouTubeAccount({
+          apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+          clerkToken: await getToken() ?? '',
+          openAuthSession: (authorizationUrl, returnUrl) => WebBrowser.openAuthSessionAsync(authorizationUrl, returnUrl),
+        }))
+        : await connectSocialAccount(user.id, platform.id);
       if (!connection.connected || !connection.verified) {
         setMessage(`${platform.name} connection is not available yet.`);
         return;
       }
       setPlatforms((current) => current.map((item) => item.id === platform.id ? { ...item, connected: connection.connected, verified: connection.verified } : item));
       setMessage(`${platform.name} connected successfully. Connect another account or press Continue.`);
-    } catch {
-      setMessage(`Could not connect ${platform.name}. Please try again.`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : `Could not connect ${platform.name}.`;
+      setMessage(detail);
+      Alert.alert(`${platform.name} connection failed`, detail);
     } finally {
       setConnectingId(null);
     }

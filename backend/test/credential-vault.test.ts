@@ -6,6 +6,7 @@ import {
   CredentialIntegrityError,
   CredentialVault,
   LocalCredentialKeyAdapter,
+  ProductionCredentialKeyAdapter,
   type CredentialEnvelope,
 } from '../src/youtube/infrastructure/security/credential-vault.js';
 
@@ -37,6 +38,18 @@ const keys = () => new LocalCredentialKeyAdapter({
 });
 
 describe('CredentialVault', () => {
+  it('supports production-scoped keys without accepting local key versions', async () => {
+    const adapter = new ProductionCredentialKeyAdapter({
+      activeKeyVersion: 'production-v1',
+      key: Buffer.alloc(32, 0x66),
+    });
+    await expect(adapter.keyForVersion('production-v1')).resolves.toHaveLength(32);
+    await expect(adapter.keyForVersion('local-v1')).rejects.toBeInstanceOf(CredentialIntegrityError);
+    expect(() => new ProductionCredentialKeyAdapter({
+      activeKeyVersion: 'local-v1', key: Buffer.alloc(32, 0x66),
+    })).toThrow(CredentialIntegrityError);
+  });
+
   it('encrypts with AES-256-GCM and decrypts only with matching authenticated context', async () => {
     const credential = fakeCredential();
     const vault = new CredentialVault(keys());

@@ -47,6 +47,68 @@ export class PrismaYouTubePersistence {
     });
   }
 
+  async completeInitialOAuthConnection(input: {
+    connectionId: string;
+    auditEventId: string;
+    ownerId: string;
+    youtubeChannelId: string;
+    channelTitle: string;
+    ciphertext: Uint8Array;
+    initializationVector: Uint8Array;
+    authenticationTag: Uint8Array;
+    keyVersion: string;
+    credentialSchemaVersion: number;
+    accessTokenExpiresAt: Date;
+    hasRefreshToken: boolean;
+    grantedScopes: string[];
+    verifiedAt: Date;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.youTubeConnection.create({
+        data: {
+          id: input.connectionId,
+          narrialUserId: input.ownerId,
+          youtubeChannelId: input.youtubeChannelId,
+          channelTitle: input.channelTitle,
+          status: 'CONNECTED',
+          credentialStatus: 'AVAILABLE',
+          lastVerifiedAt: input.verifiedAt,
+        },
+      });
+      await transaction.youTubeConnectionCredential.create({
+        data: {
+          connectionId: input.connectionId,
+          ciphertext: toPrismaBytes(input.ciphertext),
+          initializationVector: toPrismaBytes(input.initializationVector),
+          authenticationTag: toPrismaBytes(input.authenticationTag),
+          keyVersion: input.keyVersion,
+          credentialSchemaVersion: input.credentialSchemaVersion,
+          accessTokenExpiresAt: input.accessTokenExpiresAt,
+          hasRefreshToken: input.hasRefreshToken,
+        },
+      });
+      await transaction.youTubeConnectionScope.createMany({
+        data: input.grantedScopes.map((scope) => ({
+          connectionId: input.connectionId,
+          scope,
+          grantedAt: input.verifiedAt,
+          lastVerifiedAt: input.verifiedAt,
+        })),
+      });
+      await transaction.youTubeAuditEvent.create({
+        data: {
+          id: input.auditEventId,
+          narrialUserId: input.ownerId,
+          actorType: 'NARRIAL_USER',
+          eventType: 'YOUTUBE_CONNECTION_CREATED',
+          targetType: 'YOUTUBE_CONNECTION',
+          targetId: input.connectionId,
+          outcome: 'SUCCEEDED',
+        },
+      });
+    });
+  }
+
   async findConnectionForUser(id: string, ownerId: string) {
     const record = await this.prisma.youTubeConnection.findFirst({
       where: { id, narrialUserId: ownerId },
@@ -69,6 +131,20 @@ export class PrismaYouTubePersistence {
       credentialStatus: record.credentialStatus,
       version: record.version,
     };
+  }
+
+  async listConnectionsForUser(ownerId: string) {
+    return this.prisma.youTubeConnection.findMany({
+      where: { narrialUserId: ownerId },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        narrialUserId: true,
+        youtubeChannelId: true,
+        channelTitle: true,
+        status: true,
+      },
+    });
   }
 
   async saveCredentialRecord(input: {
@@ -206,6 +282,51 @@ export class PrismaYouTubePersistence {
         select: { id: true, returnDestination: true, requestedScopes: true },
       });
     });
+  }
+
+  async consumeOAuthTransactionByState(input: { stateHash: Uint8Array; now: Date }) {
+    return this.prisma.$transaction(async (transaction) => {
+      const consumed = await transaction.youTubeOAuthTransaction.updateMany({
+        where: {
+          stateHash: toPrismaBytes(input.stateHash),
+          status: 'AUTHORIZATION_PENDING',
+          consumedAt: null,
+          expiresAt: { gt: input.now },
+        },
+        data: { status: 'CONSUMING', consumedAt: input.now },
+      });
+      if (consumed.count !== 1) return null;
+      const record = await transaction.youTubeOAuthTransaction.findUnique({
+        where: { stateHash: toPrismaBytes(input.stateHash) },
+        select: {
+          id: true,
+          narrialUserId: true,
+          returnDestination: true,
+          requestedScopes: true,
+          expiresAt: true,
+          consumedAt: true,
+        },
+      });
+      return record === null ? null : {
+        id: record.id,
+        ownerId: record.narrialUserId,
+        returnDestination: record.returnDestination,
+        requestedScopes: record.requestedScopes,
+        expiresAt: record.expiresAt,
+        consumedAt: record.consumedAt,
+      };
+    });
+  }
+
+  async finishOAuthTransaction(input: {
+    id: string;
+    status: 'COMPLETED' | 'DENIED' | 'FAILED';
+  }): Promise<void> {
+    const updated = await this.prisma.youTubeOAuthTransaction.updateMany({
+      where: { id: input.id, status: 'CONSUMING', consumedAt: { not: null } },
+      data: { status: input.status },
+    });
+    if (updated.count !== 1) throw new Error('OAUTH_TRANSACTION_INVALID');
   }
 
   async claimIdempotency(input: IdempotencyClaimInput): Promise<

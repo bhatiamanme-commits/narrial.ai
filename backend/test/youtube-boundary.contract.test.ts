@@ -31,6 +31,10 @@ class FakeYouTubeConnectionRepository implements YouTubeConnectionRepository {
       ) ?? null
     );
   }
+
+  listForUser(userId: string): Promise<YouTubeConnection[]> {
+    return Promise.resolve(this.connections.filter((connection) => connection.ownerId === userId));
+  }
 }
 
 afterEach(async () => {
@@ -60,6 +64,26 @@ function createApp() {
 }
 
 describe('authenticated YouTube module boundary', () => {
+  it('lists only the authenticated user\'s safe connection fields', async () => {
+    const response = await createApp().inject({
+      method: 'GET',
+      url: '/api/v1/youtube/connections',
+      headers: { authorization: 'Bearer session-owner-a' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      data: [{
+        id: 'ytc_owner_a_123',
+        platform: 'YOUTUBE',
+        channel: { id: 'channel_safe_123', title: 'Owner A channel' },
+        status: 'CONNECTED',
+      }],
+    });
+    expect(response.body).not.toContain('ownerId');
+    expect(response.body).not.toContain('credentialEnvelope');
+  });
+
   it('rejects a missing Narrial session', async () => {
     const response = await createApp().inject({
       method: 'GET',

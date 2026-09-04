@@ -2,7 +2,7 @@ import { type Writable } from 'node:stream';
 
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
-import Fastify from 'fastify';
+import Fastify, { LogController } from 'fastify';
 
 import type { AppConfig } from './config/env.js';
 import { registerYouTubeModule, type YouTubeModuleDependencies } from './youtube/http/plugin.js';
@@ -12,6 +12,7 @@ interface BuildAppOptions {
   logStream?: Writable;
   authenticationVerifier?: YouTubeModuleDependencies['authenticationVerifier'];
   connectionRepository?: YouTubeModuleDependencies['connectionRepository'];
+  oauthService?: YouTubeModuleDependencies['oauthService'];
 }
 
 interface HandledError extends Error {
@@ -102,6 +103,7 @@ export function buildApp({
   logStream,
   authenticationVerifier,
   connectionRepository,
+  oauthService,
 }: BuildAppOptions) {
   const logger =
     config.logLevel === 'silent'
@@ -117,6 +119,9 @@ export function buildApp({
     handlerTimeout: config.handlerTimeoutMs,
     keepAliveTimeout: config.keepAliveTimeoutMs,
     requestIdHeader: false,
+    logController: new LogController({
+      disableRequestLogging: (request) => request.url.startsWith('/api/v1/youtube/oauth/callback'),
+    }),
   });
 
   void app.register(cors, {
@@ -156,7 +161,11 @@ export function buildApp({
   app.get('/health', () => ({ status: 'ok' as const }));
 
   if (authenticationVerifier && connectionRepository) {
-    void registerYouTubeModule(app, { authenticationVerifier, connectionRepository });
+    void registerYouTubeModule(app, {
+      authenticationVerifier,
+      connectionRepository,
+      ...(oauthService ? { oauthService } : {}),
+    });
   }
 
   return app;
