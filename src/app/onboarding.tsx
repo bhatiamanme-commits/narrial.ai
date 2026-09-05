@@ -67,6 +67,31 @@ export default function ConnectSocialAccountsPage() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void getTokenRef.current().then(async (clerkToken) => {
+      if (!clerkToken) return;
+      const connections = await getYouTubeConnections({
+        apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+        clerkToken,
+      });
+      const connection = connections.find((item) => item.status === 'CONNECTED');
+      if (!connection || cancelled) return;
+      const recorded = recordYouTubeConnection(user.id, connection);
+      setPlatforms((current) => current.map((item) => item.id === 'youtube' ? {
+        ...item,
+        name: recorded.account.displayName,
+        avatarUrl: recorded.account.avatarUrl,
+        connected: recorded.connected,
+        verified: recorded.verified,
+      } : item));
+    }).catch(() => {
+      // The normal connection flow reports actionable errors; background hydration stays quiet.
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!user?.id || !youtubeResult || handledYouTubeResult.current) return;
     handledYouTubeResult.current = true;
     if (youtubeResult !== 'connected') {
