@@ -36,12 +36,17 @@ export default function ConnectSocialAccountsPage() {
   const [continuing, setContinuing] = useState(false);
   const [message, setMessage] = useState('');
   const handledYouTubeResult = useRef(false);
+  const getTokenRef = useRef(getToken);
   const continueToPublishing = returnTo === '/choose-accounts' && Boolean(user?.id && getPublishableGeneratedVideo(user.id));
   const continueDestination = continueToPublishing ? '/choose-accounts' : '/generator';
   const goBack = () => {
     const action = getBackAction(router.canGoBack(), '/');
     if (action === 'back') router.back(); else router.replace(action);
   };
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -65,7 +70,7 @@ export default function ConnectSocialAccountsPage() {
     let cancelled = false;
     setConnectingId('youtube');
     setMessage('Verifying your YouTube connection.');
-    void getToken().then(async (clerkToken) => {
+    void getTokenRef.current().then(async (clerkToken) => {
       if (!clerkToken) throw new Error('Your session has expired. Please sign in again.');
       const connections = await getYouTubeConnections({
         apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
@@ -83,7 +88,7 @@ export default function ConnectSocialAccountsPage() {
       if (!cancelled) setConnectingId(null);
     });
     return () => { cancelled = true; };
-  }, [getToken, user?.id, youtubeResult]);
+  }, [user?.id, youtubeResult]);
 
   const handleConnect = async (platform: SocialPlatform) => {
     if (connectingId) return;
