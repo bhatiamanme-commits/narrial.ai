@@ -39,7 +39,11 @@ const connectionDataSchema = {
           type: 'object',
           additionalProperties: false,
           required: ['id', 'title'],
-          properties: { id: { type: 'string' }, title: { type: 'string' } },
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            thumbnailUrl: { type: 'string', format: 'uri' },
+          },
         },
         status: { enum: ['CONNECTED', 'RECONNECT_REQUIRED', 'DISCONNECTED'] },
       },

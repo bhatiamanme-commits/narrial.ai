@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import type { SocialPlatform } from './social-accounts';
@@ -38,7 +38,8 @@ type Props = {
 };
 
 export function SocialAccountCard({ platform, connecting, compact = false, onConnect }: Props) {
-  return <View style={[styles.card, compact && styles.cardCompact]}><View style={compact && styles.compactIcon}><PlatformIcon id={platform.id} name={platform.name}/></View><Text numberOfLines={1} style={[styles.name, compact && styles.nameCompact]}>{platform.name}</Text>{platform.connected && platform.verified ? <ConnectedStatus compact={compact}/> : <Pressable accessibilityRole="button" accessibilityLabel={`Connect ${platform.name}`} accessibilityState={{ busy: connecting, disabled: connecting }} disabled={connecting} onPress={() => onConnect(platform)} style={({ pressed }) => [styles.connectButton, compact && styles.connectButtonCompact, pressed && styles.pressed, connecting && styles.disabled]}>{connecting ? <><ActivityIndicator size="small" color={LIME}/><Text style={[styles.connectText, compact && styles.connectTextCompact]}>Connecting</Text></> : <Text style={[styles.connectText, compact && styles.connectTextCompact]}>Connect</Text>}</Pressable>}</View>;
+  const showChannelAvatar = platform.id === 'youtube' && platform.connected && platform.verified && platform.avatarUrl;
+  return <View style={[styles.card, compact && styles.cardCompact]}><View style={compact && styles.compactIcon}>{showChannelAvatar ? <Image accessibilityLabel={`${platform.name} channel logo`} source={{ uri: platform.avatarUrl }} style={styles.channelAvatar}/> : <PlatformIcon id={platform.id} name={platform.name}/>}</View><Text numberOfLines={1} style={[styles.name, compact && styles.nameCompact]}>{platform.name}</Text>{platform.connected && platform.verified ? <ConnectedStatus compact={compact}/> : <Pressable accessibilityRole="button" accessibilityLabel={`Connect ${platform.name}`} accessibilityState={{ busy: connecting, disabled: connecting }} disabled={connecting} onPress={() => onConnect(platform)} style={({ pressed }) => [styles.connectButton, compact && styles.connectButtonCompact, pressed && styles.pressed, connecting && styles.disabled]}>{connecting ? <><ActivityIndicator size="small" color={LIME}/><Text style={[styles.connectText, compact && styles.connectTextCompact]}>Connecting</Text></> : <Text style={[styles.connectText, compact && styles.connectTextCompact]}>Connect</Text>}</Pressable>}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -46,6 +47,7 @@ const styles = StyleSheet.create({
   cardCompact: { minHeight: 82, paddingHorizontal: 10, paddingVertical: 9 },
   iconShell: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', backgroundColor: '#030303', borderWidth: 1, borderColor: '#343434' },
   iconShellBare: { borderWidth: 0, backgroundColor: 'transparent' },
+  channelAvatar: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#232323' },
   compactIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, transform: [{ scale: 0.84 }] },
   name: { flex: 1, marginLeft: 18, color: '#F8F8F8', fontSize: 22, lineHeight: 28, fontWeight: '500' },
   nameCompact: { marginLeft: 10, fontSize: 18, lineHeight: 23 },

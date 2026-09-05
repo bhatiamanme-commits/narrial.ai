@@ -61,6 +61,7 @@ export class PrismaYouTubePersistence {
     ownerId: string;
     youtubeChannelId: string;
     channelTitle: string;
+    channelThumbnailUrl?: string;
     ciphertext: Uint8Array;
     initializationVector: Uint8Array;
     authenticationTag: Uint8Array;
@@ -84,12 +85,14 @@ export class PrismaYouTubePersistence {
           narrialUserId: input.ownerId,
           youtubeChannelId: input.youtubeChannelId,
           channelTitle: input.channelTitle,
+          ...(input.channelThumbnailUrl ? { channelThumbnailUrl: input.channelThumbnailUrl } : {}),
           status: 'CONNECTED',
           credentialStatus: 'AVAILABLE',
           lastVerifiedAt: input.verifiedAt,
         },
         update: {
           channelTitle: input.channelTitle,
+          ...(input.channelThumbnailUrl ? { channelThumbnailUrl: input.channelThumbnailUrl } : {}),
           status: 'CONNECTED',
           credentialStatus: 'AVAILABLE',
           lastVerifiedAt: input.verifiedAt,
@@ -155,6 +158,7 @@ export class PrismaYouTubePersistence {
         narrialUserId: true,
         youtubeChannelId: true,
         channelTitle: true,
+        channelThumbnailUrl: true,
         status: true,
         credentialStatus: true,
         version: true,
@@ -165,6 +169,7 @@ export class PrismaYouTubePersistence {
       ownerId: record.narrialUserId,
       youtubeChannelId: record.youtubeChannelId,
       channelTitle: record.channelTitle,
+      channelThumbnailUrl: record.channelThumbnailUrl,
       status: record.status,
       credentialStatus: record.credentialStatus,
       version: record.version,
@@ -180,6 +185,7 @@ export class PrismaYouTubePersistence {
         narrialUserId: true,
         youtubeChannelId: true,
         channelTitle: true,
+        channelThumbnailUrl: true,
         status: true,
       },
     });

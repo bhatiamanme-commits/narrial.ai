@@ -9,12 +9,12 @@ describe('GoogleYouTubeChannelProvider', () => {
       const requestUrl = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
       requests.push({ url: requestUrl, init });
       return Promise.resolve(new Response(JSON.stringify({
-        items: [{ id: 'channel-id', snippet: { title: 'Safe channel' } }],
+        items: [{ id: 'channel-id', snippet: { title: 'Safe channel', thumbnails: { default: { url: 'https://yt.example/avatar.jpg' } } } }],
       }), { status: 200 }));
     });
 
     await expect(provider.getOwnChannel('access-secret')).resolves.toEqual({
-      id: 'channel-id', title: 'Safe channel',
+      id: 'channel-id', title: 'Safe channel', thumbnailUrl: 'https://yt.example/avatar.jpg',
     });
     const url = new URL(requests[0]!.url);
     expect(url.origin + url.pathname).toBe('https://www.googleapis.com/youtube/v3/channels');

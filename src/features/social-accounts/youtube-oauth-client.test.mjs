@@ -43,7 +43,7 @@ test('starts OAuth with a Clerk token, opens Google, then refetches authoritativ
       if (String(url).endsWith('/oauth/authorizations')) {
         return new Response(JSON.stringify({ data: { authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque' } }), { status: 201 });
       }
-      return new Response(JSON.stringify({ data: [{ id: 'connection-id', platform: 'YOUTUBE', channel: { id: 'channel-id', title: 'Narrial AI' }, status: 'CONNECTED' }] }), { status: 200 });
+      return new Response(JSON.stringify({ data: [{ id: 'connection-id', platform: 'YOUTUBE', channel: { id: 'channel-id', title: 'Narrial AI', thumbnailUrl: 'https://yt.example/avatar.jpg' }, status: 'CONNECTED' }] }), { status: 200 });
     },
     openAuthSession: async (url, returnUrl) => {
       assert.match(url, /^https:\/\/accounts\.google\.com\//);
@@ -53,6 +53,7 @@ test('starts OAuth with a Clerk token, opens Google, then refetches authoritativ
   });
 
   assert.equal(result.id, 'connection-id');
+  assert.equal(result.channel.thumbnailUrl, 'https://yt.example/avatar.jpg');
   assert.equal(requests.length, 2);
   assert.equal(requests[0].init.headers.authorization, 'Bearer clerk-token');
 });

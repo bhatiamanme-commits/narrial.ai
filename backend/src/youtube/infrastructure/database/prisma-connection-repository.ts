@@ -6,6 +6,7 @@ interface ConnectionPersistence {
     ownerId: string;
     youtubeChannelId: string;
     channelTitle: string;
+    channelThumbnailUrl: string | null;
     status: string;
   } | null>;
   listConnectionsForUser(ownerId: string): Promise<Array<{
@@ -13,6 +14,7 @@ interface ConnectionPersistence {
     narrialUserId: string;
     youtubeChannelId: string;
     channelTitle: string;
+    channelThumbnailUrl: string | null;
     status: string;
   }>>;
 }
@@ -28,7 +30,11 @@ export class PrismaConnectionRepository implements YouTubeConnectionRepository {
       id: connection.id,
       ownerId: connection.ownerId,
       platform: 'YOUTUBE' as const,
-      channel: { id: connection.youtubeChannelId, title: connection.channelTitle },
+      channel: {
+        id: connection.youtubeChannelId,
+        title: connection.channelTitle,
+        ...(connection.channelThumbnailUrl ? { thumbnailUrl: connection.channelThumbnailUrl } : {}),
+      },
       status: connection.status as 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED',
     };
   }
@@ -41,7 +47,11 @@ export class PrismaConnectionRepository implements YouTubeConnectionRepository {
         id: connection.id,
         ownerId: connection.narrialUserId,
         platform: 'YOUTUBE' as const,
-        channel: { id: connection.youtubeChannelId, title: connection.channelTitle },
+        channel: {
+          id: connection.youtubeChannelId,
+          title: connection.channelTitle,
+          ...(connection.channelThumbnailUrl ? { thumbnailUrl: connection.channelThumbnailUrl } : {}),
+        },
         status: connection.status as 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED',
       }];
     });

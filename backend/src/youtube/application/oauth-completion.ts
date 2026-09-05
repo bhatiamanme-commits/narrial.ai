@@ -4,6 +4,7 @@ import type { OAuthCompletion, OAuthTokens } from './oauth-service.js';
 export interface AuthorizedYouTubeChannel {
   id: string;
   title: string;
+  thumbnailUrl?: string;
 }
 
 export interface YouTubeChannelProvider {

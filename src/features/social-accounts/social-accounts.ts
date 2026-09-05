@@ -5,6 +5,7 @@ export type SocialPlatform = {
   name: string;
   connected: boolean;
   verified: boolean;
+  avatarUrl?: string;
 };
 
 export type SocialAccount = {
@@ -15,6 +16,7 @@ export type SocialAccount = {
   connectionStatus: 'connected' | 'expired' | 'disconnected';
   tokenStatus: 'valid' | 'expired';
   verificationStatus: 'verified' | 'pending' | 'failed';
+  avatarUrl?: string;
 };
 
 export const isSocialAccountValid = (account: SocialAccount) => account.connectionStatus === 'connected' && account.tokenStatus === 'valid' && account.verificationStatus === 'verified';
@@ -112,7 +114,7 @@ export async function connectSocialAccount(userId: string, platformId: SocialPla
   return { connected: true, verified: true, account: { ...account } };
 }
 
-export function recordYouTubeConnection(userId: string, connection: { id: string; channel: { title: string }; status: 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED' }): { connected: boolean; verified: boolean; account: SocialAccount } {
+export function recordYouTubeConnection(userId: string, connection: { id: string; channel: { title: string; thumbnailUrl?: string }; status: 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED' }): { connected: boolean; verified: boolean; account: SocialAccount } {
   const state = getUserState(userId);
   const connected = connection.status === 'CONNECTED';
   const account: SocialAccount = {
@@ -120,6 +122,7 @@ export function recordYouTubeConnection(userId: string, connection: { id: string
     platform: 'youtube',
     displayName: connection.channel.title,
     username: 'YouTube channel',
+    ...(connection.channel.thumbnailUrl ? { avatarUrl: connection.channel.thumbnailUrl } : {}),
     connectionStatus: connected ? 'connected' : connection.status === 'RECONNECT_REQUIRED' ? 'expired' : 'disconnected',
     tokenStatus: connected ? 'valid' : 'expired',
     verificationStatus: connected ? 'verified' : 'failed',

@@ -40,13 +40,25 @@ export class GoogleYouTubeChannelProvider implements YouTubeChannelProvider {
       if (typeof value !== 'object' || value === null) throw new YouTubeChannelUnavailableError();
       const items = (value as { items?: unknown }).items;
       if (!Array.isArray(items) || items.length !== 1) throw new YouTubeChannelUnavailableError();
-      const channel = items[0] as { id?: unknown; snippet?: { title?: unknown } };
+      const channel = items[0] as {
+        id?: unknown;
+        snippet?: { title?: unknown; thumbnails?: { default?: { url?: unknown } } };
+      };
       if (
         typeof channel?.id !== 'string' || channel.id.length === 0 || channel.id.length > 255 ||
         typeof channel.snippet?.title !== 'string' || channel.snippet.title.length === 0 ||
         channel.snippet.title.length > 255
       ) throw new YouTubeChannelUnavailableError();
-      return { id: channel.id, title: channel.snippet.title };
+      const thumbnailUrl = channel.snippet.thumbnails?.default?.url;
+      if (thumbnailUrl !== undefined && (
+        typeof thumbnailUrl !== 'string' || thumbnailUrl.length > 2048 ||
+        !thumbnailUrl.startsWith('https://')
+      )) throw new YouTubeChannelUnavailableError();
+      return {
+        id: channel.id,
+        title: channel.snippet.title,
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      };
     } catch {
       throw new YouTubeChannelUnavailableError();
     }

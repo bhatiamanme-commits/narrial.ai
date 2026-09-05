@@ -53,8 +53,15 @@ export default function ConnectSocialAccountsPage() {
     let cancelled = false;
     void getConnectedSocialAccounts(user.id).then((accounts) => {
       if (cancelled) return;
-      const connectedPlatforms = new Set(accounts.filter(isSocialAccountValid).map((account) => account.platform));
-      setPlatforms((current) => current.map((platform) => ({ ...platform, connected: connectedPlatforms.has(platform.id), verified: connectedPlatforms.has(platform.id) })));
+      setPlatforms((current) => current.map((platform) => {
+        const account = accounts.find((item) => item.platform === platform.id && isSocialAccountValid(item));
+        return {
+          ...platform,
+          connected: Boolean(account),
+          verified: Boolean(account),
+          ...(account ? { name: account.displayName, avatarUrl: account.avatarUrl } : {}),
+        };
+      }));
     }).catch(() => { if (!cancelled) setMessage('Could not refresh connected accounts.'); });
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -80,7 +87,7 @@ export default function ConnectSocialAccountsPage() {
       if (!connection) throw new Error('YouTube connection could not be verified.');
       if (cancelled) return;
       const recorded = recordYouTubeConnection(user.id, connection);
-      setPlatforms((current) => current.map((item) => item.id === 'youtube' ? { ...item, connected: recorded.connected, verified: recorded.verified } : item));
+      setPlatforms((current) => current.map((item) => item.id === 'youtube' ? { ...item, name: recorded.account.displayName, avatarUrl: recorded.account.avatarUrl, connected: recorded.connected, verified: recorded.verified } : item));
       setMessage('YouTube connected successfully. Connect another account or press Continue.');
     }).catch((error) => {
       if (!cancelled) setMessage(error instanceof Error ? error.message : 'YouTube connection could not be verified.');

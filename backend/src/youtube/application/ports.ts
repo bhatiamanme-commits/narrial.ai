@@ -5,6 +5,7 @@ export interface YouTubeConnection {
   channel: {
     id: string;
     title: string;
+    thumbnailUrl?: string;
   };
   status: 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED';
   credentialEnvelope?: string;

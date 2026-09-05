@@ -14,6 +14,7 @@ interface AtomicConnectionPersistence {
     ownerId: string;
     youtubeChannelId: string;
     channelTitle: string;
+    channelThumbnailUrl?: string;
     ciphertext: Uint8Array;
     initializationVector: Uint8Array;
     authenticationTag: Uint8Array;
@@ -43,7 +44,7 @@ export class PrismaOAuthConnectionStore implements OAuthConnectionStore {
 
   async completeInitial(input: {
     ownerId: string;
-    channel: { id: string; title: string };
+    channel: { id: string; title: string; thumbnailUrl?: string };
     credential: CredentialPayload;
   }): Promise<void> {
     const connectionId = await this.persistence.findOAuthConnectionId(
@@ -64,6 +65,7 @@ export class PrismaOAuthConnectionStore implements OAuthConnectionStore {
       ownerId: input.ownerId,
       youtubeChannelId: input.channel.id,
       channelTitle: input.channel.title,
+      ...(input.channel.thumbnailUrl ? { channelThumbnailUrl: input.channel.thumbnailUrl } : {}),
       ciphertext: envelope.ciphertext,
       initializationVector: envelope.initializationVector,
       authenticationTag: envelope.authenticationTag,

@@ -1,7 +1,7 @@
 export type YouTubeConnection = {
   id: string;
   platform: 'YOUTUBE';
-  channel: { id: string; title: string };
+  channel: { id: string; title: string; thumbnailUrl?: string };
   status: 'CONNECTED' | 'RECONNECT_REQUIRED' | 'DISCONNECTED';
 };
 
@@ -29,6 +29,7 @@ function parseConnections(value: unknown): YouTubeConnection[] {
     if (
       typeof connection.id !== 'string' || connection.platform !== 'YOUTUBE' ||
       typeof connection.channel?.id !== 'string' || typeof connection.channel.title !== 'string' ||
+      (connection.channel.thumbnailUrl !== undefined && typeof connection.channel.thumbnailUrl !== 'string') ||
       !['CONNECTED', 'RECONNECT_REQUIRED', 'DISCONNECTED'].includes(connection.status ?? '')
     ) throw new Error('YouTube connection response is invalid.');
     return connection as YouTubeConnection;
