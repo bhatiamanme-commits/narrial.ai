@@ -71,7 +71,10 @@ function parseAppReturnUrls(value: string | undefined) {
   if (destinations.some((destination) => !destination || destination.includes('*'))) return undefined;
   try {
     const urls = destinations.map((destination) => new URL(destination));
-    if (urls.some((url) => !['https:', 'narrial:'].includes(url.protocol) || url.toString().length > 255)) {
+    const isAllowedProtocol = (url: URL) =>
+      ['https:', 'narrial:'].includes(url.protocol) ||
+      (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+    if (urls.some((url) => !isAllowedProtocol(url) || url.toString().length > 255)) {
       return undefined;
     }
   } catch {

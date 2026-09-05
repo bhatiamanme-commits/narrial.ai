@@ -62,6 +62,23 @@ describe('loadConfig', () => {
     })).toThrow('Invalid configuration fields: GOOGLE_OAUTH_REDIRECT_URI');
   });
 
+  it('allows an HTTP loopback app return for local web OAuth', () => {
+    expect(loadConfig({
+      ...validEnvironment,
+      ALLOWED_APP_RETURN_URLS: 'narrial://youtube/connection-return,http://localhost:8081/youtube/connection-return',
+    }).allowedAppReturnUrls).toEqual([
+      'narrial://youtube/connection-return',
+      'http://localhost:8081/youtube/connection-return',
+    ]);
+  });
+
+  it('rejects insecure non-loopback app returns', () => {
+    expect(() => loadConfig({
+      ...validEnvironment,
+      ALLOWED_APP_RETURN_URLS: 'http://app.narial.in/youtube/connection-return',
+    })).toThrow('Invalid configuration fields: ALLOWED_APP_RETURN_URLS');
+  });
+
   it('accepts only a production-scoped encryption-key version in production', () => {
     expect(loadConfig({
       ...validEnvironment,
