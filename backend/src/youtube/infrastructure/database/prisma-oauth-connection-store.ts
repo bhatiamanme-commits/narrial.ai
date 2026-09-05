@@ -7,6 +7,7 @@ import {
 } from '../security/credential-vault.js';
 
 interface AtomicConnectionPersistence {
+  findOAuthConnectionId(ownerId: string, youtubeChannelId: string): Promise<string | null>;
   completeInitialOAuthConnection(input: {
     connectionId: string;
     auditEventId: string;
@@ -45,7 +46,10 @@ export class PrismaOAuthConnectionStore implements OAuthConnectionStore {
     channel: { id: string; title: string };
     credential: CredentialPayload;
   }): Promise<void> {
-    const connectionId = this.runtime.randomId();
+    const connectionId = await this.persistence.findOAuthConnectionId(
+      input.ownerId,
+      input.channel.id,
+    ) ?? this.runtime.randomId();
     const envelope = await this.vault.encrypt(input.credential, {
       module: 'youtube',
       environment: this.environment,

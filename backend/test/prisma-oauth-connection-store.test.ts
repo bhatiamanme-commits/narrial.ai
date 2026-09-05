@@ -7,6 +7,7 @@ describe('PrismaOAuthConnectionStore', () => {
   it('passes only encrypted credentials into the atomic persistence boundary', async () => {
     const writes: unknown[] = [];
     const persistence = {
+      findOAuthConnectionId: () => Promise.resolve(null),
       completeInitialOAuthConnection(input: unknown) {
         writes.push(input);
         return Promise.resolve();
@@ -47,5 +48,37 @@ describe('PrismaOAuthConnectionStore', () => {
       grantedScopes: ['scope.read'],
       hasRefreshToken: true,
     });
+  });
+
+  it('reuses an existing connection id when reconnecting the same channel', async () => {
+    const writes: Array<{ connectionId: string }> = [];
+    const persistence = {
+      findOAuthConnectionId: () => Promise.resolve('existing-connection-id'),
+      completeInitialOAuthConnection(input: { connectionId: string }) {
+        writes.push(input);
+        return Promise.resolve();
+      },
+    };
+    const vault = new CredentialVault(new LocalCredentialKeyAdapter({
+      activeKeyVersion: 'test-v1',
+      keys: new Map([['test-v1', Buffer.alloc(32, 0x44)]]),
+    }));
+    const store = new PrismaOAuthConnectionStore(persistence, vault, 'test');
+
+    await store.completeInitial({
+      ownerId: 'owner-id',
+      channel: { id: 'channel-id', title: 'Safe channel' },
+      credential: {
+        credentialSchemaVersion: 1,
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+        tokenType: 'Bearer',
+        grantedScopes: ['scope.read'],
+        issuedAt: '2026-09-04T12:00:00.000Z',
+        accessTokenExpiresAt: '2026-09-04T13:00:00.000Z',
+      },
+    });
+
+    expect(writes[0]?.connectionId).toBe('existing-connection-id');
   });
 });

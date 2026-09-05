@@ -34,6 +34,14 @@ type IdempotencyClaimInput = {
 export class PrismaYouTubePersistence {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async findOAuthConnectionId(ownerId: string, youtubeChannelId: string): Promise<string | null> {
+    const connection = await this.prisma.youTubeConnection.findUnique({
+      where: { narrialUserId_youtubeChannelId: { narrialUserId: ownerId, youtubeChannelId } },
+      select: { id: true },
+    });
+    return connection?.id ?? null;
+  }
+
   async saveConnection(input: ConnectionInput) {
     return this.prisma.youTubeConnection.create({
       data: {
@@ -64,8 +72,14 @@ export class PrismaYouTubePersistence {
     verifiedAt: Date;
   }): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
-      await transaction.youTubeConnection.create({
-        data: {
+      await transaction.youTubeConnection.upsert({
+        where: {
+          narrialUserId_youtubeChannelId: {
+            narrialUserId: input.ownerId,
+            youtubeChannelId: input.youtubeChannelId,
+          },
+        },
+        create: {
           id: input.connectionId,
           narrialUserId: input.ownerId,
           youtubeChannelId: input.youtubeChannelId,
@@ -74,9 +88,19 @@ export class PrismaYouTubePersistence {
           credentialStatus: 'AVAILABLE',
           lastVerifiedAt: input.verifiedAt,
         },
+        update: {
+          channelTitle: input.channelTitle,
+          status: 'CONNECTED',
+          credentialStatus: 'AVAILABLE',
+          lastVerifiedAt: input.verifiedAt,
+          reauthorizationRequiredAt: null,
+          disconnectedAt: null,
+          version: { increment: 1 },
+        },
       });
-      await transaction.youTubeConnectionCredential.create({
-        data: {
+      await transaction.youTubeConnectionCredential.upsert({
+        where: { connectionId: input.connectionId },
+        create: {
           connectionId: input.connectionId,
           ciphertext: toPrismaBytes(input.ciphertext),
           initializationVector: toPrismaBytes(input.initializationVector),
@@ -86,6 +110,20 @@ export class PrismaYouTubePersistence {
           accessTokenExpiresAt: input.accessTokenExpiresAt,
           hasRefreshToken: input.hasRefreshToken,
         },
+        update: {
+          ciphertext: toPrismaBytes(input.ciphertext),
+          initializationVector: toPrismaBytes(input.initializationVector),
+          authenticationTag: toPrismaBytes(input.authenticationTag),
+          keyVersion: input.keyVersion,
+          credentialSchemaVersion: input.credentialSchemaVersion,
+          accessTokenExpiresAt: input.accessTokenExpiresAt,
+          hasRefreshToken: input.hasRefreshToken,
+          lastRefreshedAt: input.verifiedAt,
+          refreshFailureCount: 0,
+        },
+      });
+      await transaction.youTubeConnectionScope.deleteMany({
+        where: { connectionId: input.connectionId },
       });
       await transaction.youTubeConnectionScope.createMany({
         data: input.grantedScopes.map((scope) => ({
