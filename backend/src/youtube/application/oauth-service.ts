@@ -13,7 +13,11 @@ export interface OAuthTransaction {
 export interface OAuthTransactionRepository {
   create(transaction: OAuthTransaction): Promise<void>;
   consume(stateHash: string, now: Date): Promise<OAuthTransaction | null>;
-  finish(transactionId: string, outcome: 'COMPLETED' | 'DENIED' | 'FAILED'): Promise<void>;
+  finish(
+    transactionId: string,
+    outcome: 'COMPLETED' | 'DENIED' | 'FAILED',
+    failureCategory?: string,
+  ): Promise<void>;
 }
 
 export interface OAuthTokens {
@@ -62,11 +66,24 @@ const defaultRuntime: OAuthRuntime = {
   randomId: () => randomUUID(),
 };
 
-function safeReturn(destination: string, result: 'connected' | 'cancelled' | 'failed') {
+function safeReturn(
+  destination: string,
+  result: 'connected' | 'cancelled' | 'failed',
+  failureCategory?: string,
+) {
   const url = new URL(destination);
   url.search = '';
   url.searchParams.set('result', result);
+  if (failureCategory) url.searchParams.set('reason', failureCategory);
   return url.toString();
+}
+
+function failureCategory(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(code)) return code;
+  }
+  return 'OAUTH_COMPLETION_FAILED';
 }
 
 export class YouTubeOAuthService {
@@ -154,9 +171,10 @@ export class YouTubeOAuthService {
       });
       await this.transactions.finish(transaction.id, 'COMPLETED');
       return safeReturn(transaction.returnDestination, 'connected');
-    } catch {
-      await this.transactions.finish(transaction.id, 'FAILED');
-      return safeReturn(transaction.returnDestination, 'failed');
+    } catch (error) {
+      const category = failureCategory(error);
+      await this.transactions.finish(transaction.id, 'FAILED', category);
+      return safeReturn(transaction.returnDestination, 'failed', category);
     }
   }
 }

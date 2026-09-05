@@ -321,10 +321,14 @@ export class PrismaYouTubePersistence {
   async finishOAuthTransaction(input: {
     id: string;
     status: 'COMPLETED' | 'DENIED' | 'FAILED';
+    failureCategory?: string;
   }): Promise<void> {
     const updated = await this.prisma.youTubeOAuthTransaction.updateMany({
       where: { id: input.id, status: 'CONSUMING', consumedAt: { not: null } },
-      data: { status: input.status },
+      data: {
+        status: input.status,
+        failureCategory: input.failureCategory ?? null,
+      },
     });
     if (updated.count !== 1) throw new Error('OAUTH_TRANSACTION_INVALID');
   }

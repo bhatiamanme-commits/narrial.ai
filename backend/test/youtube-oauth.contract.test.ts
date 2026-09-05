@@ -25,6 +25,7 @@ class FakeAuthenticationVerifier implements AuthenticationVerifier {
 class InMemoryTransactions implements OAuthTransactionRepository {
   readonly records = new Map<string, OAuthTransaction>();
   readonly outcomes: string[] = [];
+  readonly failureCategories: Array<string | undefined> = [];
 
   create(transaction: OAuthTransaction): Promise<void> {
     this.records.set(transaction.stateHash, transaction);
@@ -38,17 +39,20 @@ class InMemoryTransactions implements OAuthTransactionRepository {
     return Promise.resolve(transaction);
   }
 
-  finish(_transactionId: string, outcome: 'COMPLETED' | 'DENIED' | 'FAILED'): Promise<void> {
+  finish(_transactionId: string, outcome: 'COMPLETED' | 'DENIED' | 'FAILED', failureCategory?: string): Promise<void> {
     this.outcomes.push(outcome);
+    this.failureCategories.push(failureCategory);
     return Promise.resolve();
   }
 }
 
 class FakeProvider implements OAuthProvider {
   exchanges = 0;
+  errorCode?: string;
 
   exchangeCode(): Promise<{ accessToken: string; refreshToken: string; tokenType: 'Bearer'; expiresIn: number; grantedScopes: string[] }> {
     this.exchanges += 1;
+    if (this.errorCode) return Promise.reject(Object.assign(new Error('provider failed'), { code: this.errorCode }));
     return Promise.resolve({
       accessToken: 'access-secret',
       refreshToken: 'refresh-secret',
@@ -204,5 +208,30 @@ describe('YouTube OAuth HTTP contract', () => {
     expect(response.headers.location).toBe('narrial://youtube/connection-return?result=cancelled');
     expect(provider.exchanges).toBe(0);
     expect(transactions.outcomes).toEqual(['DENIED']);
+  });
+
+  it('records and returns a safe provider failure category', async () => {
+    const { app, transactions, provider } = createApp();
+    provider.errorCode = 'OAUTH_CODE_EXCHANGE_FAILED';
+    const started = await app.inject({
+      method: 'POST',
+      url: '/api/v1/youtube/oauth/authorizations',
+      headers: { authorization: 'Bearer valid' },
+      payload: { returnDestination: 'narrial://youtube/connection-return' },
+    });
+    const state = new URL(started.json<{ data: { authorizationUrl: string } }>().data.authorizationUrl)
+      .searchParams.get('state')!;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/v1/youtube/oauth/callback?code=authorization-secret&state=${encodeURIComponent(state)}`,
+    });
+
+    expect(response.statusCode).toBe(303);
+    const destination = new URL(response.headers.location!);
+    expect(destination.searchParams.get('result')).toBe('failed');
+    expect(destination.searchParams.get('reason')).toBe('OAUTH_CODE_EXCHANGE_FAILED');
+    expect(transactions.outcomes).toEqual(['FAILED']);
+    expect(transactions.failureCategories).toEqual(['OAUTH_CODE_EXCHANGE_FAILED']);
   });
 });

@@ -23,6 +23,7 @@ interface OAuthPersistence {
   finishOAuthTransaction(input: {
     id: string;
     status: 'COMPLETED' | 'DENIED' | 'FAILED';
+    failureCategory?: string;
   }): Promise<void>;
 }
 
@@ -58,7 +59,15 @@ export class PrismaOAuthTransactionRepository implements OAuthTransactionReposit
     };
   }
 
-  finish(transactionId: string, outcome: 'COMPLETED' | 'DENIED' | 'FAILED'): Promise<void> {
-    return this.persistence.finishOAuthTransaction({ id: transactionId, status: outcome });
+  finish(
+    transactionId: string,
+    outcome: 'COMPLETED' | 'DENIED' | 'FAILED',
+    failureCategory?: string,
+  ): Promise<void> {
+    return this.persistence.finishOAuthTransaction({
+      id: transactionId,
+      status: outcome,
+      ...(failureCategory ? { failureCategory } : {}),
+    });
   }
 }
