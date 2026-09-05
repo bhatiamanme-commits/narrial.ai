@@ -1,8 +1,8 @@
 import { useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -10,7 +10,7 @@ import { getBackAction } from '@/features/navigation/navigation-utils';
 import { getPublishableGeneratedVideo } from '@/features/publishing/publishing-workflow';
 import { SocialAccountCard } from '@/features/social-accounts/social-account-card';
 import { connectSocialAccount, disconnectAllSocialAccounts, getConnectedSocialAccounts, INITIAL_SOCIAL_PLATFORMS, isSocialAccountValid, recordYouTubeConnection, type SocialPlatform, type SocialPlatformId } from '@/features/social-accounts/social-accounts';
-import { connectYouTubeAccount } from '@/features/social-accounts/youtube-oauth-client';
+import { connectYouTubeAccount, createYouTubeAuthorization, getYouTubeConnections, getYouTubeReturnUrl } from '@/features/social-accounts/youtube-oauth-client';
 
 const LIME = '#A8FF00';
 
@@ -27,7 +27,7 @@ function CircularIconButton({ label, icon, onPress, expanded }: CircularIconButt
 export default function ConnectSocialAccountsPage() {
   const { user } = useUser();
   const { getToken } = useAuth();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, youtubeResult } = useLocalSearchParams<{ returnTo?: string; youtubeResult?: string }>();
   const { height, width } = useWindowDimensions();
   const compact = height < 780 || width < 360;
   const [platforms, setPlatforms] = useState(INITIAL_SOCIAL_PLATFORMS);
@@ -35,6 +35,7 @@ export default function ConnectSocialAccountsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [message, setMessage] = useState('');
+  const handledYouTubeResult = useRef(false);
   const continueToPublishing = returnTo === '/choose-accounts' && Boolean(user?.id && getPublishableGeneratedVideo(user.id));
   const continueDestination = continueToPublishing ? '/choose-accounts' : '/generator';
   const goBack = () => {
@@ -53,19 +54,65 @@ export default function ConnectSocialAccountsPage() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id || !youtubeResult || handledYouTubeResult.current) return;
+    handledYouTubeResult.current = true;
+    if (youtubeResult !== 'connected') {
+      setMessage(youtubeResult === 'cancelled' ? 'YouTube authorization was cancelled.' : 'YouTube authorization was not completed.');
+      return;
+    }
+
+    let cancelled = false;
+    setConnectingId('youtube');
+    setMessage('Verifying your YouTube connection.');
+    void getToken().then(async (clerkToken) => {
+      if (!clerkToken) throw new Error('Your session has expired. Please sign in again.');
+      const connections = await getYouTubeConnections({
+        apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+        clerkToken,
+      });
+      const connection = connections.find((item) => item.status === 'CONNECTED');
+      if (!connection) throw new Error('YouTube connection could not be verified.');
+      if (cancelled) return;
+      const recorded = recordYouTubeConnection(user.id, connection);
+      setPlatforms((current) => current.map((item) => item.id === 'youtube' ? { ...item, connected: recorded.connected, verified: recorded.verified } : item));
+      setMessage('YouTube connected successfully. Connect another account or press Continue.');
+    }).catch((error) => {
+      if (!cancelled) setMessage(error instanceof Error ? error.message : 'YouTube connection could not be verified.');
+    }).finally(() => {
+      if (!cancelled) setConnectingId(null);
+    });
+    return () => { cancelled = true; };
+  }, [getToken, user?.id, youtubeResult]);
+
   const handleConnect = async (platform: SocialPlatform) => {
     if (connectingId) return;
     if (!user?.id) { setMessage('Sign in before connecting an account.'); return; }
     setConnectingId(platform.id);
     setMessage(`Connecting ${platform.name}.`);
     try {
-      const connection = platform.id === 'youtube'
-        ? recordYouTubeConnection(user.id, await connectYouTubeAccount({
+      let connection;
+      if (platform.id === 'youtube') {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Your session has expired. Please sign in again.');
+        if (Platform.OS === 'web') {
+          const returnUrl = getYouTubeReturnUrl('web', window.location.href);
+          const authorizationUrl = await createYouTubeAuthorization({
+            apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+            clerkToken,
+            returnUrl,
+          });
+          window.location.assign(authorizationUrl);
+          return;
+        }
+        connection = recordYouTubeConnection(user.id, await connectYouTubeAccount({
           apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
-          clerkToken: await getToken() ?? '',
+          clerkToken,
           openAuthSession: (authorizationUrl, returnUrl) => WebBrowser.openAuthSessionAsync(authorizationUrl, returnUrl),
-        }))
-        : await connectSocialAccount(user.id, platform.id);
+        }));
+      } else {
+        connection = await connectSocialAccount(user.id, platform.id);
+      }
       if (!connection.connected || !connection.verified) {
         setMessage(`${platform.name} connection is not available yet.`);
         return;

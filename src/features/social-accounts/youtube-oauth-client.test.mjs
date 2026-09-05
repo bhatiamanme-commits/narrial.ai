@@ -1,7 +1,37 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { connectYouTubeAccount } from './youtube-oauth-client.ts';
+import { connectYouTubeAccount, createYouTubeAuthorization, getYouTubeReturnUrl } from './youtube-oauth-client.ts';
+
+test('uses a same-origin HTTPS return URL on web and the app scheme on native', () => {
+  assert.equal(
+    getYouTubeReturnUrl('web', 'https://app.narial.in/onboarding'),
+    'https://app.narial.in/youtube/connection-return',
+  );
+  assert.equal(
+    getYouTubeReturnUrl('ios'),
+    'narrial://youtube/connection-return',
+  );
+});
+
+test('creates a YouTube authorization without opening a popup', async () => {
+  let request;
+  const authorizationUrl = await createYouTubeAuthorization({
+    apiUrl: 'https://api.narial.in',
+    clerkToken: 'clerk-token',
+    returnUrl: 'https://app.narial.in/youtube/connection-return',
+    fetch: async (url, init) => {
+      request = { url, init };
+      return new Response(JSON.stringify({ data: { authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque' } }), { status: 201 });
+    },
+  });
+
+  assert.match(authorizationUrl, /^https:\/\/accounts\.google\.com\//);
+  assert.equal(request.init.headers.authorization, 'Bearer clerk-token');
+  assert.deepEqual(JSON.parse(request.init.body), {
+    returnDestination: 'https://app.narial.in/youtube/connection-return',
+  });
+});
 
 test('starts OAuth with a Clerk token, opens Google, then refetches authoritative connections', async () => {
   const requests = [];
