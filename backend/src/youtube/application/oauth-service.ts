@@ -109,6 +109,7 @@ export class YouTubeOAuthService {
     authorizationUrl.searchParams.set('response_type', 'code');
     authorizationUrl.searchParams.set('scope', this.config.scopes.join(' '));
     authorizationUrl.searchParams.set('access_type', 'offline');
+    authorizationUrl.searchParams.set('prompt', 'consent');
     authorizationUrl.searchParams.set('include_granted_scopes', 'true');
     authorizationUrl.searchParams.set('state', state);
 

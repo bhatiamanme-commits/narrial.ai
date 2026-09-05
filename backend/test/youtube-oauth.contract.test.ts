@@ -128,6 +128,7 @@ describe('YouTube OAuth HTTP contract', () => {
     expect(url.searchParams.get('redirect_uri')).toBe('https://api.narial.in/api/v1/youtube/oauth/callback');
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('access_type')).toBe('offline');
+    expect(url.searchParams.get('prompt')).toBe('consent');
     expect(url.searchParams.get('include_granted_scopes')).toBe('true');
     expect(url.searchParams.get('state')).toBe('state-with-at-least-32-bytes-of-entropy');
     expect([...transactions.records.keys()]).not.toContain('state-with-at-least-32-bytes-of-entropy');
