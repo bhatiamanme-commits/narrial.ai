@@ -110,11 +110,17 @@ function AnalysisStatus({ percentage, stage, failed, onRetry }: { percentage: nu
   const activeStep = getAnalysisStepIndex(percentage);
   const stepStates = getAnalysisStepStates(activeStep);
 
-  if (done || failed) {
+  if (done && !failed) {
     return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
-      {done && !failed ? <View style={styles.statusCheck}><Icon name="check" color="#000" size={15} /></View> : <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>}
-      <Text style={styles.analysisText}>{failed ? 'Analysis failed' : 'Analysis complete'}</Text>
-      {failed && onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
+      <Text style={styles.analysisText}>Analysis complete</Text>
+    </View>;
+  }
+
+  if (failed) {
+    return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
+      <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>
+      <Text style={styles.analysisText}>Analysis failed</Text>
+      {onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
     </View>;
   }
 
@@ -140,11 +146,27 @@ function AnalysisStatus({ percentage, stage, failed, onRetry }: { percentage: nu
 
 function AnalysisSummary({ job }: { job: VideoAnalysisJob }) {
   if (!job.analysis) return null;
-  return <View style={styles.analysisSummary}>
-    <Text accessibilityRole="header" style={styles.analysisSummaryTitle}>What Narrial sees</Text>
-    <Text style={styles.analysisSummaryText}>{job.analysis.summary}</Text>
-    <Text style={styles.analysisInsight}>Hook · {job.analysis.creativeDNA.openingHook}</Text>
-    <Text style={styles.analysisInsight}>Pacing · {job.analysis.creativeDNA.pacing}</Text>
+  const { analysis } = job;
+  const { creativeDNA } = analysis;
+  const details = [
+    ['Hook', creativeDNA.openingHook],
+    ['Narrative', creativeDNA.narrativeStructure],
+    ['Pacing', creativeDNA.pacing],
+    ['Visual style', creativeDNA.visualStyle.join(', ')],
+    ['Color and mood', creativeDNA.colorMood.join(', ')],
+    ['Editing', creativeDNA.editingPatterns.join(', ')],
+    ['Audio', creativeDNA.audioStyle],
+    ...(creativeDNA.callToAction ? [['Call to action', creativeDNA.callToAction]] : []),
+  ];
+
+  return <View style={styles.analysisAnswer}>
+    <Text accessibilityRole="header" style={styles.analysisAnswerTitle}>What Narrial sees</Text>
+    <Text style={styles.analysisAnswerSummary}>{analysis.summary}</Text>
+    {details.map(([label, value]) => value ? <Text key={label} style={styles.analysisAnswerLine}><Text style={styles.analysisAnswerLabel}>{label}: </Text>{value}</Text> : null)}
+    {analysis.subjects.length ? <><Text style={styles.analysisAnswerSection}>Subjects</Text>{analysis.subjects.map((subject) => <Text key={`${subject.label}-${subject.description}`} style={styles.analysisAnswerLine}>• <Text style={styles.analysisAnswerLabel}>{subject.label}: </Text>{subject.description}</Text>)}</> : null}
+    {analysis.scenes.length ? <><Text style={styles.analysisAnswerSection}>Scenes</Text>{analysis.scenes.map((scene) => <Text key={`${scene.startSeconds}-${scene.endSeconds}`} style={styles.analysisAnswerLine}>• {scene.startSeconds}s–{scene.endSeconds}s: {scene.description}</Text>)}</> : null}
+    {analysis.reusableInsights.length ? <><Text style={styles.analysisAnswerSection}>Reusable ideas</Text>{analysis.reusableInsights.map((insight) => <Text key={insight} style={styles.analysisAnswerLine}>• {insight}</Text>)}</> : null}
+    {analysis.safetyFlags.length ? <><Text style={styles.analysisAnswerSection}>Safety notes</Text>{analysis.safetyFlags.map((flag) => <Text key={flag} style={styles.analysisAnswerLine}>• {flag}</Text>)}</> : null}
   </View>;
 }
 
@@ -363,7 +385,7 @@ const styles = StyleSheet.create({
   videoMeta: { position: 'absolute', left: 17, right: 14, bottom: 14 }, videoName: { color: TEXT, fontSize: 16, fontWeight: '700' }, videoDetails: { marginTop: 5, color: '#B0B2B0', fontSize: 13 },
   delivered: { position: 'absolute', right: -5, bottom: -9, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 3, borderColor: '#000', backgroundColor: LIME },
   analysisPill: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, paddingHorizontal: 15, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.62)' },
-  statusCheck: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: LIME }, analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
+  analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
   analysisProgress: { width: '100%', marginTop: 18, padding: 18, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: '#101210' },
   analysisProgressHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 },
   analysisStageCopy: { flex: 1 },
@@ -379,7 +401,7 @@ const styles = StyleSheet.create({
   stepMarkerText: { color: MUTED, fontSize: 11, fontWeight: '700' }, stepMarkerTextActive: { color: LIME }, stepCopy: { flex: 1 },
   stepLabel: { color: '#C4C7C2', fontSize: 14, lineHeight: 19, fontWeight: '600' }, stepLabelActive: { color: TEXT }, stepActivity: { marginTop: 2, color: MUTED, fontSize: 12, lineHeight: 17 },
   retryButton: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: LIME }, retryText: { color: '#000', fontSize: 12, fontWeight: '800' },
-  analysisSummary: { marginTop: 14, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: BORDER, backgroundColor: '#111' }, analysisSummaryTitle: { color: LIME, fontSize: 14, fontWeight: '800' }, analysisSummaryText: { marginTop: 8, color: TEXT, fontSize: 15, lineHeight: 21 }, analysisInsight: { marginTop: 7, color: MUTED, fontSize: 13, lineHeight: 18 },
+  analysisAnswer: { marginTop: 17, paddingHorizontal: 2, paddingBottom: 4 }, analysisAnswerTitle: { color: LIME, fontSize: 15, lineHeight: 21, fontWeight: '800' }, analysisAnswerSummary: { marginTop: 8, color: TEXT, fontSize: 15, lineHeight: 22 }, analysisAnswerLine: { marginTop: 7, color: '#B3B6B1', fontSize: 13, lineHeight: 19 }, analysisAnswerLabel: { color: '#D7D9D5', fontWeight: '700' }, analysisAnswerSection: { marginTop: 16, color: TEXT, fontSize: 14, lineHeight: 20, fontWeight: '800' },
   generatedVideoWrap: { width: '58%', minWidth: 210, maxWidth: 310, aspectRatio: 9 / 14, marginTop: 18, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: BORDER, backgroundColor: '#0B0B0B' },
   generatedVideo: { width: '100%', height: '100%' },
   userBubble: { maxWidth: '76%', alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#202020' }, userBubbleText: { color: TEXT, fontSize: 14 },
