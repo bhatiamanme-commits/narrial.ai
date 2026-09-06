@@ -13,6 +13,9 @@ import { PrismaYouTubePersistence } from './youtube/infrastructure/database/yout
 import { GoogleOAuthProvider } from './youtube/infrastructure/google/google-oauth-provider.js';
 import { GoogleYouTubeChannelProvider } from './youtube/infrastructure/google/google-youtube-channel-provider.js';
 import { CredentialVault, LocalCredentialKeyAdapter, ProductionCredentialKeyAdapter } from './youtube/infrastructure/security/credential-vault.js';
+import { GeminiVideoAnalyzer } from './video-analysis/gemini-video-analyzer.js';
+import { PrismaVideoAnalysisRepository } from './video-analysis/prisma-repository.js';
+import { VideoAnalysisWorker } from './video-analysis/worker.js';
 
 try {
   const config = loadConfig(process.env);
@@ -34,6 +37,15 @@ try {
       keys: new Map([[config.credentialEncryptionKeyVersion, key]]),
     });
   const credentialVault = new CredentialVault(keyAdapter);
+  const videoAnalysisRepository = new PrismaVideoAnalysisRepository(prisma);
+  const videoAnalysisWorker = new VideoAnalysisWorker(
+    videoAnalysisRepository,
+    new GeminiVideoAnalyzer({
+      apiKey: config.geminiApiKey,
+      model: config.geminiVideoModel,
+      timeoutMs: config.videoAnalysisTimeoutMs,
+    }),
+  );
   const connectionStore = new PrismaOAuthConnectionStore(
     persistence,
     credentialVault,
@@ -62,6 +74,8 @@ try {
     authenticationVerifier,
     connectionRepository: new PrismaConnectionRepository(persistence),
     oauthService,
+    videoAnalysisRepository,
+    videoAnalysisWorker,
   });
   app.addHook('onClose', async () => prisma.$disconnect());
   registerShutdownHandlers(app, config.shutdownGracePeriodMs);

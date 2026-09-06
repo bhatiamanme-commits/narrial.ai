@@ -397,6 +397,9 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 
 export const ModelName = {
+  VideoReference: 'VideoReference',
+  VideoAnalysisJob: 'VideoAnalysisJob',
+  VideoAnalysisResult: 'VideoAnalysisResult',
   YouTubeConnection: 'YouTubeConnection',
   YouTubeConnectionCredential: 'YouTubeConnectionCredential',
   YouTubeConnectionScope: 'YouTubeConnectionScope',
@@ -425,10 +428,232 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "youTubeConnection" | "youTubeConnectionCredential" | "youTubeConnectionScope" | "youTubeOAuthTransaction" | "youTubeStatusEvent" | "youTubeAuditEvent" | "youTubeVideoSource" | "youTubeUpload" | "youTubePublication" | "youTubeScheduledPublication" | "youTubeVideoSyncRecord" | "youTubeIdempotencyRecord" | "youTubeOutboxEvent"
+    modelProps: "videoReference" | "videoAnalysisJob" | "videoAnalysisResult" | "youTubeConnection" | "youTubeConnectionCredential" | "youTubeConnectionScope" | "youTubeOAuthTransaction" | "youTubeStatusEvent" | "youTubeAuditEvent" | "youTubeVideoSource" | "youTubeUpload" | "youTubePublication" | "youTubeScheduledPublication" | "youTubeVideoSyncRecord" | "youTubeIdempotencyRecord" | "youTubeOutboxEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
+    VideoReference: {
+      payload: Prisma.$VideoReferencePayload<ExtArgs>
+      fields: Prisma.VideoReferenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VideoReferenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VideoReferenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        findFirst: {
+          args: Prisma.VideoReferenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VideoReferenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        findMany: {
+          args: Prisma.VideoReferenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>[]
+        }
+        create: {
+          args: Prisma.VideoReferenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        createMany: {
+          args: Prisma.VideoReferenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VideoReferenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>[]
+        }
+        delete: {
+          args: Prisma.VideoReferenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        update: {
+          args: Prisma.VideoReferenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        deleteMany: {
+          args: Prisma.VideoReferenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VideoReferenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VideoReferenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>[]
+        }
+        upsert: {
+          args: Prisma.VideoReferenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoReferencePayload>
+        }
+        aggregate: {
+          args: Prisma.VideoReferenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVideoReference>
+        }
+        groupBy: {
+          args: Prisma.VideoReferenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoReferenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VideoReferenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoReferenceCountAggregateOutputType> | number
+        }
+      }
+    }
+    VideoAnalysisJob: {
+      payload: Prisma.$VideoAnalysisJobPayload<ExtArgs>
+      fields: Prisma.VideoAnalysisJobFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VideoAnalysisJobFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VideoAnalysisJobFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        findFirst: {
+          args: Prisma.VideoAnalysisJobFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VideoAnalysisJobFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        findMany: {
+          args: Prisma.VideoAnalysisJobFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>[]
+        }
+        create: {
+          args: Prisma.VideoAnalysisJobCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        createMany: {
+          args: Prisma.VideoAnalysisJobCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VideoAnalysisJobCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>[]
+        }
+        delete: {
+          args: Prisma.VideoAnalysisJobDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        update: {
+          args: Prisma.VideoAnalysisJobUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        deleteMany: {
+          args: Prisma.VideoAnalysisJobDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VideoAnalysisJobUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VideoAnalysisJobUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>[]
+        }
+        upsert: {
+          args: Prisma.VideoAnalysisJobUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisJobPayload>
+        }
+        aggregate: {
+          args: Prisma.VideoAnalysisJobAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVideoAnalysisJob>
+        }
+        groupBy: {
+          args: Prisma.VideoAnalysisJobGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoAnalysisJobGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VideoAnalysisJobCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoAnalysisJobCountAggregateOutputType> | number
+        }
+      }
+    }
+    VideoAnalysisResult: {
+      payload: Prisma.$VideoAnalysisResultPayload<ExtArgs>
+      fields: Prisma.VideoAnalysisResultFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VideoAnalysisResultFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VideoAnalysisResultFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        findFirst: {
+          args: Prisma.VideoAnalysisResultFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VideoAnalysisResultFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        findMany: {
+          args: Prisma.VideoAnalysisResultFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>[]
+        }
+        create: {
+          args: Prisma.VideoAnalysisResultCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        createMany: {
+          args: Prisma.VideoAnalysisResultCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VideoAnalysisResultCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>[]
+        }
+        delete: {
+          args: Prisma.VideoAnalysisResultDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        update: {
+          args: Prisma.VideoAnalysisResultUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        deleteMany: {
+          args: Prisma.VideoAnalysisResultDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VideoAnalysisResultUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VideoAnalysisResultUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>[]
+        }
+        upsert: {
+          args: Prisma.VideoAnalysisResultUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VideoAnalysisResultPayload>
+        }
+        aggregate: {
+          args: Prisma.VideoAnalysisResultAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVideoAnalysisResult>
+        }
+        groupBy: {
+          args: Prisma.VideoAnalysisResultGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoAnalysisResultGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VideoAnalysisResultCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VideoAnalysisResultCountAggregateOutputType> | number
+        }
+      }
+    }
     YouTubeConnection: {
       payload: Prisma.$YouTubeConnectionPayload<ExtArgs>
       fields: Prisma.YouTubeConnectionFieldRefs
@@ -1430,6 +1655,53 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
+export const VideoReferenceScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  provider: 'provider',
+  providerVideoId: 'providerVideoId',
+  canonicalUrl: 'canonicalUrl',
+  title: 'title',
+  thumbnailUrl: 'thumbnailUrl',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type VideoReferenceScalarFieldEnum = (typeof VideoReferenceScalarFieldEnum)[keyof typeof VideoReferenceScalarFieldEnum]
+
+
+export const VideoAnalysisJobScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  referenceId: 'referenceId',
+  status: 'status',
+  progress: 'progress',
+  stage: 'stage',
+  attemptCount: 'attemptCount',
+  errorCode: 'errorCode',
+  claimedAt: 'claimedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VideoAnalysisJobScalarFieldEnum = (typeof VideoAnalysisJobScalarFieldEnum)[keyof typeof VideoAnalysisJobScalarFieldEnum]
+
+
+export const VideoAnalysisResultScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  jobId: 'jobId',
+  schemaVersion: 'schemaVersion',
+  promptVersion: 'promptVersion',
+  analyzer: 'analyzer',
+  analysis: 'analysis',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type VideoAnalysisResultScalarFieldEnum = (typeof VideoAnalysisResultScalarFieldEnum)[keyof typeof VideoAnalysisResultScalarFieldEnum]
+
+
 export const YouTubeConnectionScalarFieldEnum = {
   id: 'id',
   narrialUserId: 'narrialUserId',
@@ -1727,6 +1999,76 @@ export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMod
 
 
 /**
+ * Reference to a field of type 'VideoReferenceProvider'
+ */
+export type EnumVideoReferenceProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VideoReferenceProvider'>
+    
+
+
+/**
+ * Reference to a field of type 'VideoReferenceProvider[]'
+ */
+export type ListEnumVideoReferenceProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VideoReferenceProvider[]'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime[]'
+ */
+export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'VideoAnalysisJobStatus'
+ */
+export type EnumVideoAnalysisJobStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VideoAnalysisJobStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'VideoAnalysisJobStatus[]'
+ */
+export type ListEnumVideoAnalysisJobStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VideoAnalysisJobStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
  * Reference to a field of type 'YouTubeConnectionStatus'
  */
 export type EnumYouTubeConnectionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'YouTubeConnectionStatus'>
@@ -1751,34 +2093,6 @@ export type EnumYouTubeCredentialStatusFieldRefInput<$PrismaModel> = FieldRefInp
  * Reference to a field of type 'YouTubeCredentialStatus[]'
  */
 export type ListEnumYouTubeCredentialStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'YouTubeCredentialStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'DateTime'
- */
-export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
-    
-
-
-/**
- * Reference to a field of type 'DateTime[]'
- */
-export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
-    
-
-
-/**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-/**
- * Reference to a field of type 'Int[]'
- */
-export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -1814,20 +2128,6 @@ export type EnumYouTubeOAuthTransactionStatusFieldRefInput<$PrismaModel> = Field
  * Reference to a field of type 'YouTubeOAuthTransactionStatus[]'
  */
 export type ListEnumYouTubeOAuthTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'YouTubeOAuthTransactionStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'Json'
- */
-export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
-    
-
-
-/**
- * Reference to a field of type 'QueryMode'
- */
-export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 
@@ -2093,6 +2393,9 @@ export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions 
  */
 export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
 export type GlobalOmitConfig = {
+  videoReference?: Prisma.VideoReferenceOmit
+  videoAnalysisJob?: Prisma.VideoAnalysisJobOmit
+  videoAnalysisResult?: Prisma.VideoAnalysisResultOmit
   youTubeConnection?: Prisma.YouTubeConnectionOmit
   youTubeConnectionCredential?: Prisma.YouTubeConnectionCredentialOmit
   youTubeConnectionScope?: Prisma.YouTubeConnectionScopeOmit

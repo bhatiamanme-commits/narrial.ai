@@ -18,6 +18,21 @@ export { Prisma }
 export * as $Enums from './enums.js'
 export * from './enums.js';
 /**
+ * Model VideoReference
+ * 
+ */
+export type VideoReference = Prisma.VideoReferenceModel
+/**
+ * Model VideoAnalysisJob
+ * 
+ */
+export type VideoAnalysisJob = Prisma.VideoAnalysisJobModel
+/**
+ * Model VideoAnalysisResult
+ * 
+ */
+export type VideoAnalysisResult = Prisma.VideoAnalysisResultModel
+/**
  * Model YouTubeConnection
  * 
  */

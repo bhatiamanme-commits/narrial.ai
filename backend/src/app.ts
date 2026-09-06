@@ -6,6 +6,7 @@ import Fastify, { LogController } from 'fastify';
 
 import type { AppConfig } from './config/env.js';
 import { registerYouTubeModule, type YouTubeModuleDependencies } from './youtube/http/plugin.js';
+import { registerVideoAnalysisModule, type VideoAnalysisModuleDependencies } from './video-analysis/http-plugin.js';
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -13,6 +14,8 @@ interface BuildAppOptions {
   authenticationVerifier?: YouTubeModuleDependencies['authenticationVerifier'];
   connectionRepository?: YouTubeModuleDependencies['connectionRepository'];
   oauthService?: YouTubeModuleDependencies['oauthService'];
+  videoAnalysisRepository?: VideoAnalysisModuleDependencies['videoAnalysisRepository'];
+  videoAnalysisWorker?: VideoAnalysisModuleDependencies['videoAnalysisWorker'];
 }
 
 interface HandledError extends Error {
@@ -104,6 +107,8 @@ export function buildApp({
   authenticationVerifier,
   connectionRepository,
   oauthService,
+  videoAnalysisRepository,
+  videoAnalysisWorker,
 }: BuildAppOptions) {
   const logger =
     config.logLevel === 'silent'
@@ -166,6 +171,9 @@ export function buildApp({
       connectionRepository,
       ...(oauthService ? { oauthService } : {}),
     });
+  }
+  if (authenticationVerifier && videoAnalysisRepository && videoAnalysisWorker) {
+    void registerVideoAnalysisModule(app, { authenticationVerifier, videoAnalysisRepository, videoAnalysisWorker });
   }
 
   return app;

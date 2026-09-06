@@ -51,6 +51,9 @@ export const AnyNull = runtime.AnyNull
 
 
 export const ModelName = {
+  VideoReference: 'VideoReference',
+  VideoAnalysisJob: 'VideoAnalysisJob',
+  VideoAnalysisResult: 'VideoAnalysisResult',
   YouTubeConnection: 'YouTubeConnection',
   YouTubeConnectionCredential: 'YouTubeConnectionCredential',
   YouTubeConnectionScope: 'YouTubeConnectionScope',
@@ -80,6 +83,53 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 } as const)
 
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
+
+
+export const VideoReferenceScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  provider: 'provider',
+  providerVideoId: 'providerVideoId',
+  canonicalUrl: 'canonicalUrl',
+  title: 'title',
+  thumbnailUrl: 'thumbnailUrl',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type VideoReferenceScalarFieldEnum = (typeof VideoReferenceScalarFieldEnum)[keyof typeof VideoReferenceScalarFieldEnum]
+
+
+export const VideoAnalysisJobScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  referenceId: 'referenceId',
+  status: 'status',
+  progress: 'progress',
+  stage: 'stage',
+  attemptCount: 'attemptCount',
+  errorCode: 'errorCode',
+  claimedAt: 'claimedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VideoAnalysisJobScalarFieldEnum = (typeof VideoAnalysisJobScalarFieldEnum)[keyof typeof VideoAnalysisJobScalarFieldEnum]
+
+
+export const VideoAnalysisResultScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  jobId: 'jobId',
+  schemaVersion: 'schemaVersion',
+  promptVersion: 'promptVersion',
+  analyzer: 'analyzer',
+  analysis: 'analysis',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type VideoAnalysisResultScalarFieldEnum = (typeof VideoAnalysisResultScalarFieldEnum)[keyof typeof VideoAnalysisResultScalarFieldEnum]
 
 
 export const YouTubeConnectionScalarFieldEnum = {

@@ -139,3 +139,20 @@ export const YouTubeOutboxStatus = {
 } as const
 
 export type YouTubeOutboxStatus = (typeof YouTubeOutboxStatus)[keyof typeof YouTubeOutboxStatus]
+
+
+export const VideoReferenceProvider = {
+  YOUTUBE: 'YOUTUBE'
+} as const
+
+export type VideoReferenceProvider = (typeof VideoReferenceProvider)[keyof typeof VideoReferenceProvider]
+
+
+export const VideoAnalysisJobStatus = {
+  QUEUED: 'QUEUED',
+  ANALYZING: 'ANALYZING',
+  COMPLETE: 'COMPLETE',
+  FAILED: 'FAILED'
+} as const
+
+export type VideoAnalysisJobStatus = (typeof VideoAnalysisJobStatus)[keyof typeof VideoAnalysisJobStatus]

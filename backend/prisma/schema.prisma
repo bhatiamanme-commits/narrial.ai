@@ -112,6 +112,76 @@ enum YouTubeOutboxStatus {
   FAILED_TERMINAL
 }
 
+enum VideoReferenceProvider {
+  YOUTUBE
+}
+
+enum VideoAnalysisJobStatus {
+  QUEUED
+  ANALYZING
+  COMPLETE
+  FAILED
+}
+
+model VideoReference {
+  id              String                 @id @db.Uuid
+  narrialUserId   String                 @map("narrial_user_id") @db.VarChar(255)
+  provider        VideoReferenceProvider
+  providerVideoId String                 @map("provider_video_id") @db.VarChar(255)
+  canonicalUrl    String                 @map("canonical_url") @db.VarChar(2048)
+  title           String                 @db.VarChar(255)
+  thumbnailUrl    String                 @map("thumbnail_url") @db.VarChar(2048)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt       DateTime               @map("expires_at") @db.Timestamptz(6)
+  jobs            VideoAnalysisJob[]
+
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, createdAt(sort: Desc)])
+  @@index([provider, providerVideoId])
+  @@index([expiresAt])
+  @@map("video_references")
+}
+
+model VideoAnalysisJob {
+  id            String                 @id @db.Uuid
+  narrialUserId String                 @map("narrial_user_id") @db.VarChar(255)
+  referenceId   String                 @map("reference_id") @db.Uuid
+  status        VideoAnalysisJobStatus @default(QUEUED)
+  progress      Int                    @default(0)
+  stage         String                 @db.VarChar(255)
+  attemptCount  Int                    @default(0) @map("attempt_count")
+  errorCode     String?                @map("error_code") @db.VarChar(100)
+  claimedAt     DateTime?              @map("claimed_at") @db.Timestamptz(6)
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reference     VideoReference         @relation(fields: [referenceId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
+  result        VideoAnalysisResult?
+
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("video_analysis_jobs")
+}
+
+model VideoAnalysisResult {
+  id            String           @id @db.Uuid
+  narrialUserId String           @map("narrial_user_id") @db.VarChar(255)
+  jobId         String           @unique @map("job_id") @db.Uuid
+  schemaVersion Int              @map("schema_version")
+  promptVersion String           @map("prompt_version") @db.VarChar(100)
+  analyzer      String           @db.VarChar(100)
+  analysis      Json
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt     DateTime         @map("expires_at") @db.Timestamptz(6)
+  job           VideoAnalysisJob @relation(fields: [jobId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
+
+  @@unique([id, narrialUserId])
+  @@unique([jobId, narrialUserId])
+  @@index([narrialUserId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("video_analysis_results")
+}
+
 model YouTubeConnection {
   id                        String                        @id @db.Uuid
   narrialUserId             String                        @map("narrial_user_id") @db.VarChar(255)

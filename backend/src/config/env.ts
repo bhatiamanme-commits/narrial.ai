@@ -17,6 +17,9 @@ export interface AppConfig {
   credentialEncryptionKey: string;
   credentialEncryptionKeyVersion: string;
   oauthStateHmacKey: string;
+  geminiApiKey: string;
+  geminiVideoModel: string;
+  videoAnalysisTimeoutMs: number;
   requestTimeoutMs: number;
   handlerTimeoutMs: number;
   keepAliveTimeoutMs: number;
@@ -127,6 +130,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
       ? rawCredentialEncryptionKeyVersion
       : undefined;
   const oauthStateHmacKey = parseEncryptionKey(environment.OAUTH_STATE_HMAC_KEY?.trim());
+  const geminiApiKey = environment.GEMINI_API_KEY?.trim() || undefined;
+  const geminiVideoModel = environment.GEMINI_VIDEO_MODEL?.trim() || undefined;
+  const videoAnalysisTimeoutMs = parseInteger(environment.VIDEO_ANALYSIS_TIMEOUT_MS, 1_000, 900_000);
   const requestTimeoutMs = parseInteger(environment.REQUEST_TIMEOUT_MS, 1, 300_000);
   const handlerTimeoutMs = parseInteger(environment.HANDLER_TIMEOUT_MS, 1, 300_000);
   const keepAliveTimeoutMs = parseInteger(environment.KEEP_ALIVE_TIMEOUT_MS, 1, 300_000);
@@ -152,6 +158,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     CREDENTIAL_ENCRYPTION_KEY: credentialEncryptionKey,
     CREDENTIAL_ENCRYPTION_KEY_VERSION: credentialEncryptionKeyVersion,
     OAUTH_STATE_HMAC_KEY: oauthStateHmacKey,
+    GEMINI_API_KEY: geminiApiKey,
+    GEMINI_VIDEO_MODEL: geminiVideoModel,
+    VIDEO_ANALYSIS_TIMEOUT_MS: videoAnalysisTimeoutMs,
     REQUEST_TIMEOUT_MS: requestTimeoutMs,
     HANDLER_TIMEOUT_MS: handlerTimeoutMs,
     KEEP_ALIVE_TIMEOUT_MS: keepAliveTimeoutMs,
@@ -180,6 +189,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     credentialEncryptionKey: credentialEncryptionKey!,
     credentialEncryptionKeyVersion: credentialEncryptionKeyVersion!,
     oauthStateHmacKey: oauthStateHmacKey!,
+    geminiApiKey: geminiApiKey!,
+    geminiVideoModel: geminiVideoModel!,
+    videoAnalysisTimeoutMs: videoAnalysisTimeoutMs!,
     requestTimeoutMs: requestTimeoutMs!,
     handlerTimeoutMs: handlerTimeoutMs!,
     keepAliveTimeoutMs: keepAliveTimeoutMs!,

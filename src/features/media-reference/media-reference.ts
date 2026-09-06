@@ -11,20 +11,22 @@ export type MediaReference = {
 export function normalizeReferenceUrl(value: string) {
   try {
     const url = new URL(value.trim());
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash) return null;
+    return getYouTubeVideoId(url) ? url.toString() : null;
   } catch {
     return null;
   }
 }
 
 function getYouTubeVideoId(url: URL) {
-  if (url.hostname === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0];
+  let videoId: string | undefined;
+  if (url.hostname === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0];
   if (url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com')) {
-    if (url.pathname === '/watch') return url.searchParams.get('v') ?? undefined;
+    if (url.pathname === '/watch') videoId = url.searchParams.get('v') ?? undefined;
     const parts = url.pathname.split('/').filter(Boolean);
-    if (['shorts', 'embed', 'live'].includes(parts[0])) return parts[1];
+    if (['shorts', 'embed', 'live'].includes(parts[0])) videoId = parts[1];
   }
-  return undefined;
+  return videoId && /^[A-Za-z0-9_-]{11}$/.test(videoId) ? videoId : undefined;
 }
 
 export function getReferenceLinkDetails(value: string): { name: string; thumbnailSource?: string } {
@@ -34,5 +36,5 @@ export function getReferenceLinkDetails(value: string): { name: string; thumbnai
     return { name: 'YouTube video', thumbnailSource: `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg` };
   }
 
-  return { name: `${url.hostname.replace(/^www\./, '')} video` };
+  return { name: 'Video reference' };
 }

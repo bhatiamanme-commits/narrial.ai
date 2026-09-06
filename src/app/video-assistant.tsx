@@ -1,4 +1,4 @@
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
@@ -22,6 +22,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 import { MediaReference } from '@/features/media-reference/media-reference';
+import { getVideoAnalysisJob, retryVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
@@ -38,7 +39,7 @@ const QUESTIONS: Question[] = [
 ];
 
 type Answer = { option?: string; custom?: string; skipped?: boolean };
-type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: MediaReference };
+type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: MediaReference; referenceId?: string; analysisJobId?: string };
 type State = { index: number; answers: Record<string, Answer>; complete: boolean; generation: GenerationInput };
 type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'close' };
 
@@ -103,11 +104,22 @@ function UploadedMediaCard({ reference }: { reference: MediaReference }) {
   </View>;
 }
 
-function AnalysisStatus({ percentage }: { percentage: number }) {
+function AnalysisStatus({ percentage, stage, failed, onRetry }: { percentage: number; stage?: string; failed?: boolean; onRetry?: () => void }) {
   const done = percentage >= 100;
   return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
-    {done ? <View style={styles.statusCheck}><Icon name="check" color="#000" size={15} /></View> : <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>}
-    <Text style={styles.analysisText}>{done ? 'Analysis complete' : `Analyzing video · ${percentage}%`}</Text>
+    {done && !failed ? <View style={styles.statusCheck}><Icon name="check" color="#000" size={15} /></View> : <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>}
+    <Text style={styles.analysisText}>{failed ? 'Analysis failed' : done ? 'Analysis complete' : `${stage ?? 'Analyzing video'} · ${percentage}%`}</Text>
+    {failed && onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
+  </View>;
+}
+
+function AnalysisSummary({ job }: { job: VideoAnalysisJob }) {
+  if (!job.analysis) return null;
+  return <View style={styles.analysisSummary}>
+    <Text accessibilityRole="header" style={styles.analysisSummaryTitle}>What Narrial sees</Text>
+    <Text style={styles.analysisSummaryText}>{job.analysis.summary}</Text>
+    <Text style={styles.analysisInsight}>Hook · {job.analysis.creativeDNA.openingHook}</Text>
+    <Text style={styles.analysisInsight}>Pacing · {job.analysis.creativeDNA.pacing}</Text>
   </View>;
 }
 
@@ -167,11 +179,14 @@ function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: Sta
 
 export default function VideoAssistantScreen() {
   const { user } = useUser();
-  const params = useLocalSearchParams<{ referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; referenceMediaType?: 'image' | 'video'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
+  const { getToken } = useAuth();
+  const params = useLocalSearchParams<{ referenceId?: string; analysisJobId?: string; referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; referenceMediaType?: 'image' | 'video'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
   const composerRef = useRef<TextInput>(null);
-  const [percentage, setPercentage] = useState(8);
+  const [percentage, setPercentage] = useState(params.analysisJobId ? 0 : 8);
+  const [analysisJob, setAnalysisJob] = useState<VideoAnalysisJob | null>(null);
+  const [analysisRun, setAnalysisRun] = useState(0);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
   const reference = params.referenceName && params.referenceSource && (params.referenceType === 'file' || params.referenceType === 'url')
@@ -186,6 +201,8 @@ export default function VideoAssistantScreen() {
       videoCount: params.videoCount ?? '3 videos',
       aspectRatio: params.aspectRatio ?? '9:16',
       reference,
+      ...(params.referenceId ? { referenceId: params.referenceId } : {}),
+      ...(params.analysisJobId ? { analysisJobId: params.analysisJobId } : {}),
     },
   });
   const fade = useMemo(() => new Animated.Value(1), []);
@@ -201,15 +218,36 @@ export default function VideoAssistantScreen() {
   });
 
   useEffect(() => {
+    if (params.analysisJobId) return;
     const timer = setInterval(() => setPercentage(value => value >= 100 ? 100 : Math.min(100, value + 23)), 420);
     return () => clearInterval(timer);
-  }, []);
+  }, [params.analysisJobId]);
   useEffect(() => {
-    if (percentage === 100) {
+    if (!params.analysisJobId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Authentication required');
+        const job = await getVideoAnalysisJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: params.analysisJobId! });
+        if (cancelled) return;
+        setAnalysisJob(job);
+        setPercentage(job.progress);
+        if (job.status === 'QUEUED' || job.status === 'ANALYZING') timer = setTimeout(poll, 2_000);
+      } catch {
+        if (!cancelled) setAnalysisJob((current) => current ?? { id: params.analysisJobId!, referenceId: params.referenceId ?? '', status: 'FAILED', progress: 100, stage: 'Analysis failed', errorCode: 'VIDEO_ANALYSIS_REQUEST_FAILED', updatedAt: new Date().toISOString() });
+      }
+    };
+    void poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [analysisRun, getToken, params.analysisJobId, params.referenceId]);
+  useEffect(() => {
+    if (percentage === 100 && analysisJob?.status !== 'FAILED') {
       AccessibilityInfo.announceForAccessibility('Analysis complete. Question 1 of 4. What are you creating?');
       if (user?.id) markGeneratedVideoReady(user.id, 'generated-video-primary');
     }
-  }, [percentage, user?.id]);
+  }, [analysisJob?.status, percentage, user?.id]);
   useEffect(() => {
     Animated.sequence([Animated.timing(fade, { toValue: 0, duration: 90, useNativeDriver: true }), Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true })]).start();
     if (percentage === 100 && !state.complete) AccessibilityInfo.announceForAccessibility(`Question ${state.index + 1} of 4. ${currentQuestion.title}`);
@@ -231,6 +269,25 @@ export default function VideoAssistantScreen() {
     dispatch({ type: action });
     setDetails('');
   };
+  const retryAnalysis = async () => {
+    if (!params.analysisJobId) return;
+    if (analysisJob?.errorCode === 'VIDEO_ANALYSIS_REQUEST_FAILED') {
+      setAnalysisJob(null);
+      setPercentage(0);
+      setAnalysisRun((value) => value + 1);
+      return;
+    }
+    try {
+      const clerkToken = await getToken();
+      if (!clerkToken) throw new Error('Authentication required');
+      const job = await retryVideoAnalysisJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: params.analysisJobId });
+      setAnalysisJob(job);
+      setPercentage(job.progress);
+      setAnalysisRun((value) => value + 1);
+    } catch {
+      void AccessibilityInfo.announceForAccessibility('Video analysis could not be retried.');
+    }
+  };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -238,13 +295,14 @@ export default function VideoAssistantScreen() {
         <ScrollView style={styles.conversationScroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
             {state.generation.reference ? <UploadedMediaCard reference={state.generation.reference} /> : null}
-            <AnalysisStatus percentage={percentage} />
-            {percentage >= 100 ? <GeneratedVideoCard /> : null}
+            <AnalysisStatus percentage={percentage} stage={analysisJob?.stage} failed={analysisJob?.status === 'FAILED'} onRetry={retryAnalysis} />
+            {analysisJob?.status === 'COMPLETE' ? <AnalysisSummary job={analysisJob} /> : null}
+            {percentage >= 100 && analysisJob?.status !== 'FAILED' ? <GeneratedVideoCard /> : null}
             {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {state.complete ? <View style={styles.completionBubble}><View style={styles.completionCheck}><Icon name="check" color="#000" size={17} /></View><Text style={styles.completionText}>there is the video based on the all reference</Text></View> : null}
           </View>
-          {percentage >= 100 && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} onAdvance={advanceQuestion} /></Animated.View> : null}
+          {percentage >= 100 && analysisJob?.status !== 'FAILED' && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} onAdvance={advanceQuestion} /></Animated.View> : null}
         </ScrollView>
         <View style={styles.composer}>
           <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
@@ -281,6 +339,8 @@ const styles = StyleSheet.create({
   delivered: { position: 'absolute', right: -5, bottom: -9, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 3, borderColor: '#000', backgroundColor: LIME },
   analysisPill: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, paddingHorizontal: 15, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.62)' },
   statusCheck: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: LIME }, analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
+  retryButton: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: LIME }, retryText: { color: '#000', fontSize: 12, fontWeight: '800' },
+  analysisSummary: { marginTop: 14, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: BORDER, backgroundColor: '#111' }, analysisSummaryTitle: { color: LIME, fontSize: 14, fontWeight: '800' }, analysisSummaryText: { marginTop: 8, color: TEXT, fontSize: 15, lineHeight: 21 }, analysisInsight: { marginTop: 7, color: MUTED, fontSize: 13, lineHeight: 18 },
   generatedVideoWrap: { width: '58%', minWidth: 210, maxWidth: 310, aspectRatio: 9 / 14, marginTop: 18, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: BORDER, backgroundColor: '#0B0B0B' },
   generatedVideo: { width: '100%', height: '100%' },
   userBubble: { maxWidth: '76%', alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#202020' }, userBubbleText: { color: TEXT, fontSize: 14 },

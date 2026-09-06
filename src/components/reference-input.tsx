@@ -87,7 +87,7 @@ export function ReferenceInput({ value, onChange }: { value: MediaReference | nu
   const addUrl = async () => {
     const normalized = normalizeReferenceUrl(url);
     if (!normalized) {
-      setError('Enter a valid video URL beginning with http:// or https://.');
+      setError('Enter a public YouTube link that starts with https://.');
       return;
     }
     setAddingLink(true);

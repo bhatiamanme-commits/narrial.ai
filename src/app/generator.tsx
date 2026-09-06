@@ -1,7 +1,7 @@
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
@@ -9,6 +9,7 @@ import { BottomActionBar } from '@/components/bottom-action-bar';
 import { ReferenceInput } from '@/components/reference-input';
 import { MediaReference } from '@/features/media-reference/media-reference';
 import { beginVideoGeneration } from '@/features/publishing/publishing-workflow';
+import { submitVideoReference } from '@/features/video-analysis/video-analysis-client';
 
 const LIME = '#9DFF00';
 const BORDER = '#315400';
@@ -31,34 +32,48 @@ function ChoiceModal({ title, choices, visible, onClose, onChoose }: { title: st
 
 export default function GeneratorScreen() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const { height, width } = useWindowDimensions();
   const [prompt, setPrompt] = useState('');
   const [videoCount, setVideoCount] = useState('3 videos');
   const [aspectRatio, setAspectRatio] = useState('9:16');
   const [openPicker, setOpenPicker] = useState<'count' | 'ratio' | null>(null);
   const [reference, setReference] = useState<MediaReference | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const compact = height / width <= 1.85;
   const email = user?.primaryEmailAddress?.emailAddress ?? 'Signed-in profile';
   const initial = useMemo(() => email.charAt(0).toUpperCase(), [email]);
 
-  const generate = () => {
+  const generate = async () => {
     if (!prompt.trim()) return Alert.alert('Add a prompt', 'Describe the videos you want Narrial to create.');
-    if (user?.id) beginVideoGeneration(user.id);
-    router.push({
-      pathname: '/video-assistant',
-      params: {
-        prompt: prompt.trim(),
-        videoCount,
-        aspectRatio,
-        ...(reference ? {
-          referenceName: reference.name,
-          referenceSource: reference.source,
-          ...(reference.thumbnailSource ? { referenceThumbnailSource: reference.thumbnailSource } : {}),
-          referenceType: reference.type,
-          referenceMediaType: reference.mediaType,
-        } : {}),
-      },
-    });
+    setSubmitting(true);
+    try {
+      let analysisParams: { referenceId?: string; analysisJobId?: string } = {};
+      if (reference?.type === 'url') {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Please sign in again before analyzing a video.');
+        const submitted = await submitVideoReference({
+          apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, url: reference.source,
+        });
+        analysisParams = { referenceId: submitted.reference.id, analysisJobId: submitted.analysisJob.id };
+      }
+      if (user?.id) beginVideoGeneration(user.id);
+      router.push({
+        pathname: '/video-assistant',
+        params: {
+          prompt: prompt.trim(), videoCount, aspectRatio, ...analysisParams,
+          ...(reference ? {
+            referenceName: reference.name, referenceSource: reference.source,
+            ...(reference.thumbnailSource ? { referenceThumbnailSource: reference.thumbnailSource } : {}),
+            referenceType: reference.type, referenceMediaType: reference.mediaType,
+          } : {}),
+        },
+      });
+    } catch (error) {
+      Alert.alert('Video could not be analyzed', error instanceof Error ? error.message : 'Try again in a moment.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openSocialConnections = () => router.push('/onboarding');
@@ -86,7 +101,7 @@ export default function GeneratorScreen() {
             <View style={[styles.optionCard, compact && styles.optionCardCompact]}><ReferenceInput value={reference} onChange={setReference} /></View>
           </View>
 
-          <Pressable accessibilityRole="button" accessibilityLabel="Generate videos" onPress={generate} style={({ pressed }) => [styles.generateButton, compact && styles.generateButtonCompact, pressed && styles.pressed]}><Text style={styles.generateText}>Generate Videos</Text><Icon name="arrow" color="#000000" size={28} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Generate videos" accessibilityState={{ disabled: submitting }} disabled={submitting} onPress={generate} style={({ pressed }) => [styles.generateButton, compact && styles.generateButtonCompact, submitting && { opacity: .55 }, pressed && styles.pressed]}>{submitting ? <ActivityIndicator color="#000000" /> : <><Text style={styles.generateText}>Generate Videos</Text><Icon name="arrow" color="#000000" size={28} /></>}</Pressable>
         </ScrollView>
         <BottomActionBar
           onOpenSocialConnections={openSocialConnections}

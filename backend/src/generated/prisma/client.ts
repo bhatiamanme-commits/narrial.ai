@@ -31,8 +31,8 @@ export * from "./enums.js"
  * const prisma = new PrismaClient({
  *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
  * })
- * // Fetch zero or more YouTubeConnections
- * const youTubeConnections = await prisma.youTubeConnection.findMany()
+ * // Fetch zero or more VideoReferences
+ * const videoReferences = await prisma.videoReference.findMany()
  * ```
  * 
  * Read more in our [docs](https://pris.ly/d/client).
@@ -41,6 +41,21 @@ export const PrismaClient = $Class.getPrismaClientClass()
 export type PrismaClient<LogOpts extends Prisma.LogLevel = never, OmitOpts extends Prisma.PrismaClientOptions["omit"] = Prisma.PrismaClientOptions["omit"], ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = $Class.PrismaClient<LogOpts, OmitOpts, ExtArgs>
 export { Prisma }
 
+/**
+ * Model VideoReference
+ * 
+ */
+export type VideoReference = Prisma.VideoReferenceModel
+/**
+ * Model VideoAnalysisJob
+ * 
+ */
+export type VideoAnalysisJob = Prisma.VideoAnalysisJobModel
+/**
+ * Model VideoAnalysisResult
+ * 
+ */
+export type VideoAnalysisResult = Prisma.VideoAnalysisResultModel
 /**
  * Model YouTubeConnection
  * 
