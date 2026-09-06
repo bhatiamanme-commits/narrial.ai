@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildClarificationQuestions, buildCreativeBrief, createVideoProject, regenerateScene, runQualityCheck } from './video-project.ts';
+import { buildClarificationQuestions, buildCreativeBrief, createVideoProject, getClarificationStartIndex, regenerateScene, runQualityCheck } from './video-project.ts';
 
 const dna = {
   schemaVersion: 1, referenceId: 'ref-1', generatedAt: '2026-09-06T00:00:00.000Z', confidence: 0.78,
@@ -18,6 +18,13 @@ test('questions adapt to known topic and never repeat it', () => {
   assert.ok(questions.some((question) => question.id === 'audience'));
   assert.ok(!questions.some((question) => question.id === 'topic'));
   assert.ok(questions.every((question) => question.options.length >= 2 && question.options.length <= 6));
+});
+
+test('an entirely answered clarification session has no invalid question index', () => {
+  const answers = { topic: 'Explain Narial AI', audience: 'Creators', emotion: 'Trust', action: 'Try the product' };
+  const questions = buildClarificationQuestions(dna, answers);
+  assert.equal(questions.length, 0);
+  assert.equal(getClarificationStartIndex(questions, answers), -1);
 });
 
 test('creates a 30-second original production plan with independent scenes', () => {

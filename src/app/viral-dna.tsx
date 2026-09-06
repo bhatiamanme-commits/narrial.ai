@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 import { loadViralDNASession, loadVideoProject, saveViralDNASession, saveVideoProject, type ViralDNASessionSeed } from '@/features/video-creation/project-storage';
-import { advanceVideoProject, buildClarificationQuestions, buildCreativeBrief, createVideoProject, GENERATION_STAGES, regenerateScene, runQualityCheck, updateSceneScript, type BriefAnswer, type VideoProject, type VideoScene } from '@/features/video-creation/video-project';
+import { advanceVideoProject, buildClarificationQuestions, buildCreativeBrief, createVideoProject, GENERATION_STAGES, getClarificationStartIndex, regenerateScene, runQualityCheck, updateSceneScript, type BriefAnswer, type VideoProject, type VideoScene } from '@/features/video-creation/video-project';
 import { deriveViralDNA, type ViralDNA } from '@/features/viral-dna/viral-dna';
 
 const C = { bg: '#000000', surface: '#0B0D0A', raised: '#121510', lime: '#A8FF1A', text: '#F7F8F4', muted: '#969B92', border: '#2C3822', danger: '#FF7B72' };
@@ -62,10 +62,10 @@ function DNAScreen({ seed, dna, onCreate }: { seed: ViralDNASessionSeed; dna: Vi
 
 function QuestionScreen({ dna, answers, setAnswers, onBack, onDone }: { dna: ViralDNA; answers: BriefAnswer; setAnswers: (answers: BriefAnswer) => void; onBack: () => void; onDone: () => void }) {
   const [questions] = useState(() => buildClarificationQuestions(dna, answers));
-  const firstUnanswered = Math.max(0, questions.findIndex((question) => !answers[question.id]));
-  const [index, setIndex] = useState(firstUnanswered < 0 ? questions.length - 1 : firstUnanswered);
+  const [index, setIndex] = useState(() => getClarificationStartIndex(questions, answers));
   const [custom, setCustom] = useState('');
   const question = questions[index];
+  if (!question) return <View style={styles.centerPage}><View style={styles.questionPanel}><Pill accent>Answers ready</Pill><Text accessibilityRole="header" style={styles.questionTitle}>Your creative direction is complete</Text><Text style={styles.subtitle}>All required answers were restored safely. Continue to review the brief.</Text><View style={styles.footer}><Action secondary label="Back" onPress={onBack} /><Action label="Review brief" onPress={onDone} /></View></View></View>;
   const selected = answers[question.id];
   const choose = (value: string) => setAnswers({ ...answers, [question.id]: value });
   const next = () => { if (index === questions.length - 1) onDone(); else { setIndex(index + 1); setCustom(''); } };

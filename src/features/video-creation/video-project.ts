@@ -36,6 +36,12 @@ export function buildClarificationQuestions(dna: ViralDNA, known: BriefAnswer = 
   return definitions.filter((question) => !known[question.id]);
 }
 
+export function getClarificationStartIndex(questions: ClarificationQuestion[], answers: BriefAnswer): number {
+  const firstUnanswered = questions.findIndex((question) => !answers[question.id]);
+  if (firstUnanswered >= 0) return firstUnanswered;
+  return questions.length ? questions.length - 1 : -1;
+}
+
 export function buildCreativeBrief(answers: BriefAnswer, dna: ViralDNA): CreativeBrief {
   if (!answers.topic?.trim()) throw new Error('A topic is required before generation.');
   return {
