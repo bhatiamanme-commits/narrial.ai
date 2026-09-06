@@ -23,6 +23,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 import { MediaReference } from '@/features/media-reference/media-reference';
 import { getVideoAnalysisJob, retryVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
+import { ANALYSIS_STEPS, getAnalysisStepIndex, getAnalysisStepStates } from '@/features/video-assistant/video-assistant-state';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
@@ -106,10 +107,34 @@ function UploadedMediaCard({ reference }: { reference: MediaReference }) {
 
 function AnalysisStatus({ percentage, stage, failed, onRetry }: { percentage: number; stage?: string; failed?: boolean; onRetry?: () => void }) {
   const done = percentage >= 100;
-  return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
-    {done && !failed ? <View style={styles.statusCheck}><Icon name="check" color="#000" size={15} /></View> : <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>}
-    <Text style={styles.analysisText}>{failed ? 'Analysis failed' : done ? 'Analysis complete' : `${stage ?? 'Analyzing video'} · ${percentage}%`}</Text>
-    {failed && onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
+  const activeStep = getAnalysisStepIndex(percentage);
+  const stepStates = getAnalysisStepStates(activeStep);
+
+  if (done || failed) {
+    return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
+      {done && !failed ? <View style={styles.statusCheck}><Icon name="check" color="#000" size={15} /></View> : <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>}
+      <Text style={styles.analysisText}>{failed ? 'Analysis failed' : 'Analysis complete'}</Text>
+      {failed && onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
+    </View>;
+  }
+
+  return <View accessibilityLiveRegion="polite" accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: percentage, text: stage ?? ANALYSIS_STEPS[activeStep].activity }} style={styles.analysisProgress}>
+    <View style={styles.analysisProgressHeader}>
+      <View style={styles.analysisStageCopy}><Text style={styles.analysisEyebrow}>NARRIAL IS ANALYZING</Text><Text style={styles.analysisStage}>{stage ?? ANALYSIS_STEPS[activeStep].label}</Text></View>
+      <Text style={styles.analysisPercentage}>{percentage}%</Text>
+    </View>
+    <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${percentage}%` }]} /></View>
+    <View style={styles.analysisSteps}>
+      {ANALYSIS_STEPS.map((step, index) => {
+        const stepState = stepStates[index];
+        return <View key={step.id} style={[styles.analysisStep, stepState === 'upcoming' && styles.analysisStepMuted]}>
+          <View style={[styles.stepMarker, stepState === 'active' && styles.stepMarkerActive, stepState === 'complete' && styles.stepMarkerComplete]}>
+            {stepState === 'complete' ? <Icon name="check" color="#000" size={12} /> : <Text style={[styles.stepMarkerText, stepState === 'active' && styles.stepMarkerTextActive]}>{index + 1}</Text>}
+          </View>
+          <View style={styles.stepCopy}><Text style={[styles.stepLabel, stepState === 'active' && styles.stepLabelActive]}>{step.label}</Text>{stepState === 'active' ? <Text style={styles.stepActivity}>{step.activity}</Text> : null}</View>
+        </View>;
+      })}
+    </View>
   </View>;
 }
 
@@ -339,6 +364,20 @@ const styles = StyleSheet.create({
   delivered: { position: 'absolute', right: -5, bottom: -9, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13, borderWidth: 3, borderColor: '#000', backgroundColor: LIME },
   analysisPill: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, paddingHorizontal: 15, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.62)' },
   statusCheck: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: LIME }, analysisText: { color: TEXT, fontSize: 15 }, dots: { flexDirection: 'row', gap: 4 }, dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: LIME },
+  analysisProgress: { width: '100%', marginTop: 18, padding: 18, borderRadius: 22, borderWidth: 1, borderColor: BORDER, backgroundColor: '#101210' },
+  analysisProgressHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 },
+  analysisStageCopy: { flex: 1 },
+  analysisEyebrow: { color: LIME, fontSize: 11, lineHeight: 16, fontWeight: '800', letterSpacing: 1 },
+  analysisStage: { marginTop: 3, color: TEXT, fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  analysisPercentage: { color: LIME, fontSize: 20, lineHeight: 25, fontWeight: '800' },
+  progressTrack: { height: 4, marginTop: 15, overflow: 'hidden', borderRadius: 2, backgroundColor: '#30332F' },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: LIME },
+  analysisSteps: { gap: 13, marginTop: 17 },
+  analysisStep: { minHeight: 32, flexDirection: 'row', alignItems: 'flex-start', gap: 11 }, analysisStepMuted: { opacity: .42 },
+  stepMarker: { width: 24, height: 24, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#555A53' },
+  stepMarkerActive: { borderColor: LIME, backgroundColor: 'rgba(168,255,26,.12)' }, stepMarkerComplete: { borderColor: LIME, backgroundColor: LIME },
+  stepMarkerText: { color: MUTED, fontSize: 11, fontWeight: '700' }, stepMarkerTextActive: { color: LIME }, stepCopy: { flex: 1 },
+  stepLabel: { color: '#C4C7C2', fontSize: 14, lineHeight: 19, fontWeight: '600' }, stepLabelActive: { color: TEXT }, stepActivity: { marginTop: 2, color: MUTED, fontSize: 12, lineHeight: 17 },
   retryButton: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: LIME }, retryText: { color: '#000', fontSize: 12, fontWeight: '800' },
   analysisSummary: { marginTop: 14, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: BORDER, backgroundColor: '#111' }, analysisSummaryTitle: { color: LIME, fontSize: 14, fontWeight: '800' }, analysisSummaryText: { marginTop: 8, color: TEXT, fontSize: 15, lineHeight: 21 }, analysisInsight: { marginTop: 7, color: MUTED, fontSize: 13, lineHeight: 18 },
   generatedVideoWrap: { width: '58%', minWidth: 210, maxWidth: 310, aspectRatio: 9 / 14, marginTop: 18, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: BORDER, backgroundColor: '#0B0B0B' },
