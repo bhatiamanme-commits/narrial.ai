@@ -19,6 +19,8 @@ export interface AppConfig {
   oauthStateHmacKey: string;
   geminiApiKey: string;
   geminiVideoModel: string;
+  geminiGenerationModel: string;
+  videoGenerationTimeoutMs: number;
   videoAnalysisTimeoutMs: number;
   requestTimeoutMs: number;
   handlerTimeoutMs: number;
@@ -132,6 +134,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
   const oauthStateHmacKey = parseEncryptionKey(environment.OAUTH_STATE_HMAC_KEY?.trim());
   const geminiApiKey = environment.GEMINI_API_KEY?.trim() || undefined;
   const geminiVideoModel = environment.GEMINI_VIDEO_MODEL?.trim() || undefined;
+  const geminiGenerationModel = environment.GEMINI_GENERATION_MODEL?.trim() || 'veo-3.1-fast-generate-preview';
+  const videoGenerationTimeoutMs = parseInteger(environment.VIDEO_GENERATION_TIMEOUT_MS, 1_000, 300_000) ?? 30_000;
   const videoAnalysisTimeoutMs = parseInteger(environment.VIDEO_ANALYSIS_TIMEOUT_MS, 1_000, 900_000);
   const requestTimeoutMs = parseInteger(environment.REQUEST_TIMEOUT_MS, 1, 300_000);
   const handlerTimeoutMs = parseInteger(environment.HANDLER_TIMEOUT_MS, 1, 300_000);
@@ -160,6 +164,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     OAUTH_STATE_HMAC_KEY: oauthStateHmacKey,
     GEMINI_API_KEY: geminiApiKey,
     GEMINI_VIDEO_MODEL: geminiVideoModel,
+    GEMINI_GENERATION_MODEL: geminiGenerationModel,
+    VIDEO_GENERATION_TIMEOUT_MS: videoGenerationTimeoutMs,
     VIDEO_ANALYSIS_TIMEOUT_MS: videoAnalysisTimeoutMs,
     REQUEST_TIMEOUT_MS: requestTimeoutMs,
     HANDLER_TIMEOUT_MS: handlerTimeoutMs,
@@ -191,6 +197,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     oauthStateHmacKey: oauthStateHmacKey!,
     geminiApiKey: geminiApiKey!,
     geminiVideoModel: geminiVideoModel!,
+    geminiGenerationModel,
+    videoGenerationTimeoutMs,
     videoAnalysisTimeoutMs: videoAnalysisTimeoutMs!,
     requestTimeoutMs: requestTimeoutMs!,
     handlerTimeoutMs: handlerTimeoutMs!,

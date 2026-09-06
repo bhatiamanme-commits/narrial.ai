@@ -274,6 +274,23 @@ export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
   _max?: Prisma.NestedJsonFilter<$PrismaModel>
 }
 
+export type EnumVideoGenerationJobStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VideoGenerationJobStatus | Prisma.EnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel> | $Enums.VideoGenerationJobStatus
+}
+
+export type EnumVideoGenerationJobStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VideoGenerationJobStatus | Prisma.EnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVideoGenerationJobStatusWithAggregatesFilter<$PrismaModel> | $Enums.VideoGenerationJobStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel>
+}
+
 export type EnumYouTubeConnectionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.YouTubeConnectionStatus | Prisma.EnumYouTubeConnectionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.YouTubeConnectionStatus[] | Prisma.ListEnumYouTubeConnectionStatusFieldRefInput<$PrismaModel>
@@ -821,6 +838,23 @@ export type NestedJsonFilterBase<$PrismaModel = never> = {
   gt?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   gte?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel>
   not?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | Prisma.JsonNullValueFilter
+}
+
+export type NestedEnumVideoGenerationJobStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VideoGenerationJobStatus | Prisma.EnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel> | $Enums.VideoGenerationJobStatus
+}
+
+export type NestedEnumVideoGenerationJobStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VideoGenerationJobStatus | Prisma.EnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VideoGenerationJobStatus[] | Prisma.ListEnumVideoGenerationJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVideoGenerationJobStatusWithAggregatesFilter<$PrismaModel> | $Enums.VideoGenerationJobStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVideoGenerationJobStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumYouTubeConnectionStatusFilter<$PrismaModel = never> = {

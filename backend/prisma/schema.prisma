@@ -123,6 +123,13 @@ enum VideoAnalysisJobStatus {
   FAILED
 }
 
+enum VideoGenerationJobStatus {
+  STARTING
+  GENERATING
+  COMPLETE
+  FAILED
+}
+
 model VideoReference {
   id              String                 @id @db.Uuid
   narrialUserId   String                 @map("narrial_user_id") @db.VarChar(255)
@@ -180,6 +187,30 @@ model VideoAnalysisResult {
   @@index([narrialUserId, createdAt(sort: Desc)])
   @@index([expiresAt])
   @@map("video_analysis_results")
+}
+
+model VideoGenerationJob {
+  id                    String                   @id @db.Uuid
+  narrialUserId         String                   @map("narrial_user_id") @db.VarChar(255)
+  projectId             String                   @map("project_id") @db.VarChar(100)
+  prompt                String
+  aspectRatio           String                   @map("aspect_ratio") @db.VarChar(10)
+  status                VideoGenerationJobStatus @default(STARTING)
+  progress              Int                      @default(5)
+  stage                 String                   @db.VarChar(255)
+  providerOperationName String?                  @unique @map("provider_operation_name") @db.VarChar(1024)
+  videoUri              String?                  @map("video_uri") @db.VarChar(4096)
+  errorCode             String?                  @map("error_code") @db.VarChar(100)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  expiresAt             DateTime                 @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([narrialUserId, projectId])
+  @@unique([id, narrialUserId])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+  @@index([expiresAt])
+  @@map("video_generation_jobs")
 }
 
 model YouTubeConnection {

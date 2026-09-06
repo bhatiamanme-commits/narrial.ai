@@ -11,6 +11,7 @@
 export type * from './models/VideoReference.js'
 export type * from './models/VideoAnalysisJob.js'
 export type * from './models/VideoAnalysisResult.js'
+export type * from './models/VideoGenerationJob.js'
 export type * from './models/YouTubeConnection.js'
 export type * from './models/YouTubeConnectionCredential.js'
 export type * from './models/YouTubeConnectionScope.js'

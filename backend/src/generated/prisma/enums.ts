@@ -156,3 +156,13 @@ export const VideoAnalysisJobStatus = {
 } as const
 
 export type VideoAnalysisJobStatus = (typeof VideoAnalysisJobStatus)[keyof typeof VideoAnalysisJobStatus]
+
+
+export const VideoGenerationJobStatus = {
+  STARTING: 'STARTING',
+  GENERATING: 'GENERATING',
+  COMPLETE: 'COMPLETE',
+  FAILED: 'FAILED'
+} as const
+
+export type VideoGenerationJobStatus = (typeof VideoGenerationJobStatus)[keyof typeof VideoGenerationJobStatus]

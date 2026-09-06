@@ -16,6 +16,8 @@ import { CredentialVault, LocalCredentialKeyAdapter, ProductionCredentialKeyAdap
 import { GeminiVideoAnalyzer } from './video-analysis/gemini-video-analyzer.js';
 import { PrismaVideoAnalysisRepository } from './video-analysis/prisma-repository.js';
 import { VideoAnalysisWorker } from './video-analysis/worker.js';
+import { GeminiVideoGenerator } from './video-generation/gemini-video-generator.js';
+import { PrismaVideoGenerationRepository } from './video-generation/prisma-repository.js';
 
 try {
   const config = loadConfig(process.env);
@@ -76,6 +78,8 @@ try {
     oauthService,
     videoAnalysisRepository,
     videoAnalysisWorker,
+    videoGenerationRepository: new PrismaVideoGenerationRepository(prisma),
+    videoGenerator: new GeminiVideoGenerator({ apiKey: config.geminiApiKey, model: config.geminiGenerationModel, timeoutMs: config.videoGenerationTimeoutMs }),
   });
   app.addHook('onClose', async () => prisma.$disconnect());
   registerShutdownHandlers(app, config.shutdownGracePeriodMs);

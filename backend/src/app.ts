@@ -7,6 +7,7 @@ import Fastify, { LogController } from 'fastify';
 import type { AppConfig } from './config/env.js';
 import { registerYouTubeModule, type YouTubeModuleDependencies } from './youtube/http/plugin.js';
 import { registerVideoAnalysisModule, type VideoAnalysisModuleDependencies } from './video-analysis/http-plugin.js';
+import { registerVideoGenerationModule, type VideoGenerationModuleDependencies } from './video-generation/http-plugin.js';
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -16,6 +17,8 @@ interface BuildAppOptions {
   oauthService?: YouTubeModuleDependencies['oauthService'];
   videoAnalysisRepository?: VideoAnalysisModuleDependencies['videoAnalysisRepository'];
   videoAnalysisWorker?: VideoAnalysisModuleDependencies['videoAnalysisWorker'];
+  videoGenerationRepository?: VideoGenerationModuleDependencies['videoGenerationRepository'];
+  videoGenerator?: VideoGenerationModuleDependencies['videoGenerator'];
 }
 
 interface HandledError extends Error {
@@ -109,6 +112,8 @@ export function buildApp({
   oauthService,
   videoAnalysisRepository,
   videoAnalysisWorker,
+  videoGenerationRepository,
+  videoGenerator,
 }: BuildAppOptions) {
   const logger =
     config.logLevel === 'silent'
@@ -174,6 +179,9 @@ export function buildApp({
   }
   if (authenticationVerifier && videoAnalysisRepository && videoAnalysisWorker) {
     void registerVideoAnalysisModule(app, { authenticationVerifier, videoAnalysisRepository, videoAnalysisWorker });
+  }
+  if (authenticationVerifier && videoGenerationRepository && videoGenerator) {
+    void registerVideoGenerationModule(app, { authenticationVerifier, videoGenerationRepository, videoGenerator });
   }
 
   return app;

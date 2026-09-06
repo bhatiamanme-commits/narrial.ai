@@ -1,4 +1,4 @@
-import { useUser } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 import { loadViralDNASession, loadVideoProject, saveViralDNASession, saveVideoProject, type ViralDNASessionSeed } from '@/features/video-creation/project-storage';
-import { advanceVideoProject, buildClarificationQuestions, buildCreativeBrief, createVideoProject, GENERATION_STAGES, getClarificationStartIndex, regenerateScene, runQualityCheck, updateSceneScript, type BriefAnswer, type VideoProject, type VideoScene } from '@/features/video-creation/video-project';
+import { downloadGeneratedVideo, getVideoGenerationJob, startVideoGeneration } from '@/features/video-creation/video-generation-client';
+import { buildClarificationQuestions, buildCreativeBrief, createVideoProject, GENERATION_STAGES, getClarificationStartIndex, regenerateScene, runQualityCheck, updateSceneScript, type BriefAnswer, type VideoProject, type VideoScene } from '@/features/video-creation/video-project';
 import { deriveViralDNA, type ViralDNA } from '@/features/viral-dna/viral-dna';
 
 const C = { bg: '#000000', surface: '#0B0D0A', raised: '#121510', lime: '#A8FF1A', text: '#F7F8F4', muted: '#969B92', border: '#2C3822', danger: '#FF7B72' };
@@ -98,13 +99,14 @@ function BriefScreen({ brief, setBrief, dna, onBack, onGenerate }: { brief: Retu
   </ScrollView>;
 }
 
-function GenerationScreen({ project, onOpenEditor }: { project: VideoProject; onOpenEditor: () => void }) {
+function GenerationScreen({ project, onOpenEditor, onRetry }: { project: VideoProject; onOpenEditor: () => void; onRetry: () => void }) {
   const stageIndex = Math.max(0, GENERATION_STAGES.indexOf(project.generation.stage as typeof GENERATION_STAGES[number]));
   return <ScrollView contentContainerStyle={styles.page}><Pill accent>Production in progress</Pill><Text accessibilityRole="header" style={styles.title}>{project.generation.stage}</Text><Text style={styles.subtitle}>Each clip is generated independently, so a retry never resets approved work.</Text>
     <View style={styles.progressHero}><Text style={styles.progressNumber}>{project.generation.progress}%</Text><View style={styles.progress}><View style={[styles.progressFill, { width: `${project.generation.progress}%` }]} /></View><Text style={styles.helper}>Job {project.generation.jobId}</Text></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clipRail}>{project.scenes.map((scene, index) => <View key={scene.id} style={styles.clipCard}><View style={[styles.clipThumb, scene.status === 'ready' && styles.clipThumbReady]}><Text style={styles.clipNumber}>{index + 1}</Text></View><Text style={styles.markerLabel}>Clip {index + 1} · {scene.purpose}</Text><Text style={styles.helper}>{formatTime(scene.startSeconds)}–{formatTime(scene.endSeconds)}</Text><Pill accent={scene.status === 'ready'}>{scene.status}</Pill></View>)}</ScrollView>
     <View style={styles.stageList}>{GENERATION_STAGES.map((stage, index) => <View key={stage} style={[styles.stageRow, index > stageIndex && styles.muted]}><View style={[styles.stageDot, index <= stageIndex && styles.stageDotActive]} /><Text style={styles.body}>{stage}</Text></View>)}</View>
-    {project.status === 'preview-ready' ? <Action label="Open unified video workspace →" onPress={onOpenEditor} /> : null}
+    {project.generation.error ? <View style={styles.guardrail}><Text accessibilityRole="alert" style={[styles.guardrailTitle, { color: C.danger }]}>Generation could not finish</Text><Text style={styles.body}>{project.generation.error}</Text><Action label="Retry generation" onPress={onRetry} /></View> : null}
+    {project.status === 'preview-ready' ? <Action label="Open generated video →" onPress={onOpenEditor} /> : null}
   </ScrollView>;
 }
 
@@ -117,12 +119,12 @@ function SceneInspector({ project, scene, onChange }: { project: VideoProject; s
   </View>;
 }
 
-function EditorScreen({ project, onChange }: { project: VideoProject; onChange: (project: VideoProject) => void }) {
+function EditorScreen({ project, onChange, previewSource }: { project: VideoProject; onChange: (project: VideoProject) => void; previewSource?: string }) {
   const { user } = useUser();
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(project.scenes[0].id);
   const selected = project.scenes.find((scene) => scene.id === selectedId) ?? project.scenes[0];
-  const player = useVideoPlayer(SAMPLE_VIDEO, (instance) => { instance.loop = true; });
+  const player = useVideoPlayer(previewSource || SAMPLE_VIDEO, (instance) => { instance.loop = true; });
   const quality = project.quality ?? runQualityCheck(project);
   const publish = () => { if (user?.id) markGeneratedVideoReady(user.id, project.id); router.push('/generated-video'); };
   return <ScrollView contentContainerStyle={styles.page}><View style={styles.rowBetween}><View><Pill accent>Preview ready</Pill><Text accessibilityRole="header" style={styles.title}>Your video, scene by scene</Text></View><Text style={styles.helper}>{formatTime(project.timeline.durationSeconds)} · {project.brief.aspectRatio}</Text></View>
@@ -133,6 +135,7 @@ function EditorScreen({ project, onChange }: { project: VideoProject; onChange: 
 }
 
 export default function ViralDNAWorkflowScreen() {
+  const { getToken } = useAuth();
   const params = useLocalSearchParams<{ sessionId?: string; projectId?: string }>();
   const [seed, setSeed] = useState<ViralDNASessionSeed | null>(null);
   const [dna, setDna] = useState<ViralDNA | null>(null);
@@ -141,6 +144,7 @@ export default function ViralDNAWorkflowScreen() {
   const [project, setProject] = useState<VideoProject | null>(null);
   const [phase, setPhase] = useState<Phase>('dna');
   const [error, setError] = useState('');
+  const [previewSource, setPreviewSource] = useState<string>();
 
   useEffect(() => { void (async () => {
     try {
@@ -154,23 +158,77 @@ export default function ViralDNAWorkflowScreen() {
   useEffect(() => { if (!project) return; void saveVideoProject(project); }, [project]);
   useEffect(() => { if (!seed || project || !['dna', 'questions', 'brief'].includes(phase)) return; void saveViralDNASession({ ...seed, answers, ...(brief ? { brief } : {}), phase: phase as 'dna' | 'questions' | 'brief', savedAt: new Date().toISOString() }); }, [answers, brief, phase, project, seed]);
   useEffect(() => {
-    if (phase !== 'generating' || !project || project.status === 'preview-ready') return;
-    const timer = setTimeout(() => setProject((current) => current ? advanceVideoProject(current) : current), 650);
-    return () => clearTimeout(timer);
-  }, [phase, project]);
+    if (phase !== 'generating' || !project?.generation.remoteJobId || project.status === 'preview-ready' || project.generation.error) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Sign in again before generating video.');
+        const remote = await getVideoGenerationJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: project.generation.remoteJobId! });
+        if (cancelled) return;
+        if (remote.status === 'FAILED') { setProject((current) => current ? { ...current, status: 'partial-generation', generation: { ...current.generation, progress: 100, stage: remote.stage, error: 'The video provider could not generate this clip. Retry to create a new attempt.', updatedAt: remote.updatedAt } } : current); return; }
+        if (remote.status === 'COMPLETE' && remote.playbackPath) {
+          const source = await downloadGeneratedVideo({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, playbackPath: remote.playbackPath });
+          if (cancelled) { if (source.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(source); return; }
+          setPreviewSource(source);
+          setProject((current) => current ? { ...current, status: 'preview-ready', scenes: current.scenes.map((scene, index) => index === 0 ? { ...scene, status: 'ready' } : scene), generation: { ...current.generation, playbackPath: remote.playbackPath, progress: 100, stage: 'Real Veo clip ready', error: undefined, updatedAt: remote.updatedAt } } : current);
+          return;
+        }
+        setProject((current) => current ? { ...current, status: 'generating', generation: { ...current.generation, progress: remote.progress, stage: remote.stage, updatedAt: remote.updatedAt } } : current);
+        timer = setTimeout(poll, 10_000);
+      } catch {
+        if (!cancelled) {
+          setProject((current) => current ? { ...current, generation: { ...current.generation, stage: 'Connection interrupted — retrying', updatedAt: new Date().toISOString() } } : current);
+          timer = setTimeout(poll, 10_000);
+        }
+      }
+    };
+    void poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [getToken, phase, project?.generation.error, project?.generation.remoteJobId, project?.status]);
+
+  useEffect(() => () => { if (previewSource?.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(previewSource); }, [previewSource]);
+  useEffect(() => {
+    if (!project?.generation.playbackPath || previewSource) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const clerkToken = await getToken();
+        if (!clerkToken) return;
+        const source = await downloadGeneratedVideo({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, playbackPath: project.generation.playbackPath! });
+        if (cancelled && source.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(source); else if (!cancelled) setPreviewSource(source);
+      } catch { /* the user can retry from generation state */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken, previewSource, project?.generation.playbackPath]);
 
   if (error) return <SafeAreaView style={styles.loading}><Text accessibilityRole="alert" style={styles.cardTitle}>{error}</Text><Action label="Back to generator" onPress={() => router.replace('/generator')} /></SafeAreaView>;
   if (!seed || !dna) return <SafeAreaView style={styles.loading}><ActivityIndicator accessibilityLabel="Opening Viral DNA" color={C.lime} /><Text style={styles.helper}>Opening the saved analysis…</Text></SafeAreaView>;
   const prepareBrief = () => { try { setBrief(buildCreativeBrief(answers, dna)); setPhase('brief'); } catch (reason) { Alert.alert('A topic is still needed', reason instanceof Error ? reason.message : 'Add a topic to continue.'); } };
-  const generate = () => { if (!brief) return; const created = createVideoProject({ dna, brief }); setProject(created); setPhase('generating'); router.setParams({ projectId: created.id }); };
+  const beginRealGeneration = async (created: VideoProject) => {
+    setProject({ ...created, status: 'generating', generation: { ...created.generation, progress: 5, stage: 'Connecting to Veo', error: undefined, updatedAt: new Date().toISOString() } });
+    setPhase('generating');
+    try {
+      const clerkToken = await getToken();
+      if (!clerkToken) throw new Error('Sign in again before generating video.');
+      const first = created.scenes[0];
+      const prompt = `${first.generationPrompt}\nSpoken line: ${first.scriptLine}\nAudio: original ${created.brief.musicEnergy.toLowerCase()} music and ${first.voiceEmotion.toLowerCase()} narration. Create one self-contained opening clip inspired only by the structural DNA; never copy the source video, creator, dialogue, music, branding, or shots.`.slice(0, 8_000);
+      const remote = await startVideoGeneration({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, projectId: created.id, prompt, aspectRatio: created.brief.aspectRatio === '16:9' ? '16:9' : '9:16' });
+      setProject((current) => current ? { ...current, generation: { ...current.generation, remoteJobId: remote.id, progress: remote.progress, stage: remote.stage, ...(remote.errorCode ? { error: 'The video provider rejected this generation request.' } : {}), updatedAt: remote.updatedAt } } : current);
+      router.setParams({ projectId: created.id });
+    } catch (reason) { setProject((current) => current ? { ...current, status: 'partial-generation', generation: { ...current.generation, error: reason instanceof Error ? reason.message : 'Video generation failed.', updatedAt: new Date().toISOString() } } : current); }
+  };
+  const generate = () => { if (!brief) return; void beginRealGeneration(createVideoProject({ dna, brief })); };
+  const retryGeneration = () => { if (!project) return; const retryProject = { ...project, id: `project-${Date.now().toString(36)}`, generation: { ...project.generation, remoteJobId: undefined, playbackPath: undefined, error: undefined } }; void beginRealGeneration(retryProject); };
   const changeProject = (next: VideoProject) => { setProject(next); if (next.status !== 'preview-ready') setPhase(next.status === 'editing' ? 'editor' : 'generating'); };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     {phase === 'dna' ? <DNAScreen seed={seed} dna={dna} onCreate={() => setPhase('questions')} /> : null}
     {phase === 'questions' ? <QuestionScreen dna={dna} answers={answers} setAnswers={setAnswers} onBack={() => setPhase('dna')} onDone={prepareBrief} /> : null}
     {phase === 'brief' && brief ? <BriefScreen brief={brief} setBrief={setBrief} dna={dna} onBack={() => setPhase('questions')} onGenerate={generate} /> : null}
-    {phase === 'generating' && project ? <GenerationScreen project={project} onOpenEditor={() => setPhase('editor')} /> : null}
-    {phase === 'editor' && project ? <EditorScreen project={project} onChange={changeProject} /> : null}
+    {phase === 'generating' && project ? <GenerationScreen project={project} onOpenEditor={() => setPhase('editor')} onRetry={retryGeneration} /> : null}
+    {phase === 'editor' && project ? <EditorScreen project={project} onChange={changeProject} previewSource={previewSource} /> : null}
   </SafeAreaView>;
 }
 

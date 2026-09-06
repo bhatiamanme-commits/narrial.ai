@@ -18,7 +18,7 @@ export type VideoProject = {
   hooks: { id: string; text: string; score: number; selected: boolean; reason: string }[];
   script: string; continuity: { id: string; character: string; wardrobe: string; environment: string; lighting: string; cameraLanguage: string; colorPalette: string; visualStyle: string; lockedElements: string[] };
   scenes: VideoScene[]; timeline: { durationSeconds: number; sceneOrder: string[]; captionsTrack: string[]; voiceoverTrack: string[]; musicTrack: string; transitions: string[] };
-  generation: { jobId: string; progress: number; stage: string; error?: string; updatedAt: string };
+  generation: { jobId: string; remoteJobId?: string; playbackPath?: string; progress: number; stage: string; error?: string; updatedAt: string };
   quality?: QualityReport;
 };
 export type QualityReport = { status: 'passed' | 'needs-review'; checkedAt: string; checks: { id: string; label: string; passed: boolean; detail: string }[] };

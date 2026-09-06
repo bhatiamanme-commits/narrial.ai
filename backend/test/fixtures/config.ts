@@ -18,6 +18,8 @@ export const testConfig: AppConfig = {
   oauthStateHmacKey: Buffer.alloc(32, 0x55).toString('base64'),
   geminiApiKey: 'gemini-test-key',
   geminiVideoModel: 'gemini-test-model',
+  geminiGenerationModel: 'veo-3.1-fast-generate-preview',
+  videoGenerationTimeoutMs: 30_000,
   videoAnalysisTimeoutMs: 120_000,
   requestTimeoutMs: 10_000,
   handlerTimeoutMs: 5_000,

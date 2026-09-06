@@ -54,6 +54,7 @@ export const ModelName = {
   VideoReference: 'VideoReference',
   VideoAnalysisJob: 'VideoAnalysisJob',
   VideoAnalysisResult: 'VideoAnalysisResult',
+  VideoGenerationJob: 'VideoGenerationJob',
   YouTubeConnection: 'YouTubeConnection',
   YouTubeConnectionCredential: 'YouTubeConnectionCredential',
   YouTubeConnectionScope: 'YouTubeConnectionScope',
@@ -130,6 +131,26 @@ export const VideoAnalysisResultScalarFieldEnum = {
 } as const
 
 export type VideoAnalysisResultScalarFieldEnum = (typeof VideoAnalysisResultScalarFieldEnum)[keyof typeof VideoAnalysisResultScalarFieldEnum]
+
+
+export const VideoGenerationJobScalarFieldEnum = {
+  id: 'id',
+  narrialUserId: 'narrialUserId',
+  projectId: 'projectId',
+  prompt: 'prompt',
+  aspectRatio: 'aspectRatio',
+  status: 'status',
+  progress: 'progress',
+  stage: 'stage',
+  providerOperationName: 'providerOperationName',
+  videoUri: 'videoUri',
+  errorCode: 'errorCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  expiresAt: 'expiresAt'
+} as const
+
+export type VideoGenerationJobScalarFieldEnum = (typeof VideoGenerationJobScalarFieldEnum)[keyof typeof VideoGenerationJobScalarFieldEnum]
 
 
 export const YouTubeConnectionScalarFieldEnum = {
