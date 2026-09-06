@@ -4,7 +4,16 @@ export type VideoAnalysis = {
   durationSeconds: number;
   language?: string;
   subjects: { label: string; description: string }[];
-  scenes: { startSeconds: number; endSeconds: number; description: string }[];
+  scenes: {
+    startSeconds: number;
+    endSeconds: number;
+    description: string;
+    shotType?: string;
+    cameraMovement?: string;
+    transition?: string;
+    onScreenText?: string[];
+    spokenContent?: string;
+  }[];
   creativeDNA: {
     openingHook: string;
     narrativeStructure: string;

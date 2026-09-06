@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -18,18 +19,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { markGeneratedVideoReady } from '@/features/publishing/publishing-workflow';
 import { MediaReference } from '@/features/media-reference/media-reference';
 import { getVideoAnalysisJob, retryVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
 import { ANALYSIS_STEPS, getAnalysisStepIndex, getAnalysisStepStates } from '@/features/video-assistant/video-assistant-state';
+import { saveViralDNASession } from '@/features/video-creation/project-storage';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
 const MUTED = '#929692';
 const BORDER = 'rgba(255,255,255,0.18)';
-const GENERATED_VIDEO = require('../../assets/videos/chihuahua-bully-crocodile.mp4');
 
 type Question = { id: string; title: string; support: string; options: string[]; customOption?: string; defaultOption?: string };
 const QUESTIONS: Question[] = [
@@ -170,27 +170,39 @@ function AnalysisSummary({ job }: { job: VideoAnalysisJob }) {
   </View>;
 }
 
-function GeneratedVideoCard() {
-  const player = useVideoPlayer(GENERATED_VIDEO, (instance) => {
-    instance.loop = true;
-    instance.muted = true;
-    instance.play();
-  });
-
-  return <Pressable
-    accessibilityRole="button"
-    accessibilityLabel="Open generated video full screen with sound"
-    onPress={() => router.push('/generated-video')}
-    style={({ pressed }) => [styles.generatedVideoWrap, pressed && styles.pressed]}
-  >
-    <VideoView
-      accessibilityLabel="Generated video showing a Chihuahua and bully dog with a crocodile toy"
-      contentFit="cover"
-      nativeControls={false}
-      player={player}
-      style={styles.generatedVideo}
-    />
-  </Pressable>;
+function CreateFromDNAButton({ job, generation }: { job: VideoAnalysisJob | null; generation: GenerationInput }) {
+  const [saving, setSaving] = useState(false);
+  const openWorkflow = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const analysis = job?.analysis ?? {
+        schemaVersion: 1 as const,
+        summary: `A short-form concept about ${generation.prompt || 'the creator’s idea'}.`,
+        durationSeconds: 30,
+        subjects: [],
+        scenes: [
+          { startSeconds: 0, endSeconds: 3, description: 'Opening hook and visual interruption' },
+          { startSeconds: 3, endSeconds: 12, description: 'Problem and curiosity escalation' },
+          { startSeconds: 12, endSeconds: 25, description: 'Explanation and payoff' },
+          { startSeconds: 25, endSeconds: 30, description: 'Call to action' },
+        ],
+        creativeDNA: { openingHook: 'Open loop', narrativeStructure: 'Hook, problem, insight, payoff, CTA', pacing: 'Fast', visualStyle: ['Clean creator-led visuals'], colorMood: ['Curious'], editingPatterns: ['Direct cuts', 'Keyword captions'], audioStyle: 'Energetic voiceover', callToAction: 'One clear next step' },
+        reusableInsights: ['Open with a clear unanswered question.', 'Deliver the payoff before the final CTA.'], safetyFlags: [],
+      };
+      const sessionId = `dna-${Date.now().toString(36)}`;
+      await saveViralDNASession({
+        id: sessionId, referenceId: generation.referenceId ?? job?.referenceId ?? sessionId,
+        referenceName: generation.reference?.name ?? 'Analyzed concept', referenceSource: generation.reference?.source,
+        referenceThumbnailSource: generation.reference?.thumbnailSource, platform: 'Short-form video',
+        aspectRatio: generation.aspectRatio, topic: generation.prompt, analysis, savedAt: new Date().toISOString(),
+      });
+      router.push({ pathname: '/viral-dna', params: { sessionId } });
+    } catch {
+      AccessibilityInfo.announceForAccessibility('The Viral DNA workspace could not be opened.');
+    } finally { setSaving(false); }
+  };
+  return <Pressable accessibilityRole="button" accessibilityLabel="Create a new original video from this DNA" accessibilityState={{ busy: saving, disabled: saving }} disabled={saving} onPress={openWorkflow} style={({ pressed }) => [styles.dnaButton, pressed && styles.pressed]}>{saving ? <ActivityIndicator color="#000" /> : <><Text style={styles.dnaButtonText}>Create a New Video from This DNA</Text><Icon name="arrow" color="#000" size={22} /></>}</Pressable>;
 }
 
 function OptionRow({ index, label, selected, onPress }: { index: number; label: string; selected: boolean; onPress: () => void }) {
@@ -298,7 +310,7 @@ export default function VideoAssistantScreen() {
   useEffect(() => {
     Animated.sequence([Animated.timing(fade, { toValue: 0, duration: 90, useNativeDriver: true }), Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true })]).start();
     if (percentage === 100 && !state.complete) AccessibilityInfo.announceForAccessibility(`Question ${state.index + 1} of 4. ${currentQuestion.title}`);
-  }, [state.index]);
+  }, [currentQuestion.title, fade, percentage, state.complete, state.index]);
 
   const onComposerChange = (value: string) => {
     setDetails(value);
@@ -344,7 +356,7 @@ export default function VideoAssistantScreen() {
             {state.generation.reference ? <UploadedMediaCard reference={state.generation.reference} /> : null}
             <AnalysisStatus percentage={percentage} stage={analysisJob?.stage} failed={analysisJob?.status === 'FAILED'} onRetry={retryAnalysis} />
             {analysisJob?.status === 'COMPLETE' ? <AnalysisSummary job={analysisJob} /> : null}
-            {percentage >= 100 && analysisJob?.status !== 'FAILED' ? <GeneratedVideoCard /> : null}
+            {percentage >= 100 && analysisJob?.status !== 'FAILED' ? <CreateFromDNAButton job={analysisJob} generation={state.generation} /> : null}
             {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {state.complete ? <View style={styles.completionBubble}><View style={styles.completionCheck}><Icon name="check" color="#000" size={17} /></View><Text style={styles.completionText}>there is the video based on the all reference</Text></View> : null}
@@ -402,8 +414,7 @@ const styles = StyleSheet.create({
   stepLabel: { color: '#C4C7C2', fontSize: 14, lineHeight: 19, fontWeight: '600' }, stepLabelActive: { color: TEXT }, stepActivity: { marginTop: 2, color: MUTED, fontSize: 12, lineHeight: 17 },
   retryButton: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: LIME }, retryText: { color: '#000', fontSize: 12, fontWeight: '800' },
   analysisAnswer: { marginTop: 17, paddingHorizontal: 2, paddingBottom: 4 }, analysisAnswerTitle: { color: LIME, fontSize: 15, lineHeight: 21, fontWeight: '800' }, analysisAnswerSummary: { marginTop: 8, color: TEXT, fontSize: 15, lineHeight: 22 }, analysisAnswerLine: { marginTop: 7, color: '#B3B6B1', fontSize: 13, lineHeight: 19 }, analysisAnswerLabel: { color: '#D7D9D5', fontWeight: '700' }, analysisAnswerSection: { marginTop: 16, color: TEXT, fontSize: 14, lineHeight: 20, fontWeight: '800' },
-  generatedVideoWrap: { width: '58%', minWidth: 210, maxWidth: 310, aspectRatio: 9 / 14, marginTop: 18, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: BORDER, backgroundColor: '#0B0B0B' },
-  generatedVideo: { width: '100%', height: '100%' },
+  dnaButton: { minHeight: 58, marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18, borderRadius: 20, backgroundColor: LIME }, dnaButtonText: { color: '#000', fontSize: 15, fontWeight: '900' },
   userBubble: { maxWidth: '76%', alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#202020' }, userBubbleText: { color: TEXT, fontSize: 14 },
   completionBubble: { maxWidth: '82%', minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 28, borderWidth: 1, borderColor: BORDER },
   completionCheck: { width: 30, height: 30, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: LIME },
