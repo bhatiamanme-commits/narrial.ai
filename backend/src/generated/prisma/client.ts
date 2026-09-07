@@ -57,11 +57,6 @@ export type VideoAnalysisJob = Prisma.VideoAnalysisJobModel
  */
 export type VideoAnalysisResult = Prisma.VideoAnalysisResultModel
 /**
- * Model VideoGenerationJob
- * 
- */
-export type VideoGenerationJob = Prisma.VideoGenerationJobModel
-/**
  * Model YouTubeConnection
  * 
  */
