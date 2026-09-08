@@ -14,3 +14,25 @@ test('completed analysis is a plain full response without a green status icon', 
   assert.match(summary, /audioStyle/);
   assert.doesNotMatch(summary, /styles\.analysisSummary/);
 });
+
+test('analysis progress is a simple vertical step timeline', async () => {
+  const source = await readFile(new URL('./video-assistant.tsx', import.meta.url), 'utf8');
+  const status = source.slice(source.indexOf('function AnalysisStatus'), source.indexOf('function AnalysisSummary'));
+
+  assert.doesNotMatch(status, /analysisEyebrow|analysisPercentage|progressTrack/);
+  assert.match(status, /LoadingCircle/);
+  assert.match(status, /stepConnector/);
+});
+
+test('completed analysis scrolls the conversation to the option sheet', async () => {
+  const source = await readFile(new URL('./video-assistant.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /conversationScrollRef/);
+  assert.match(source, /scrollToEnd\(\{ animated: true \}\)/);
+});
+
+test('analysis completion does not show a generated video before options are answered', async () => {
+  const source = await readFile(new URL('./video-assistant.tsx', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(source, /GeneratedVideoCard/);
+});

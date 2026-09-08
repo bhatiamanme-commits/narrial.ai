@@ -5,12 +5,22 @@ type CollectedAnswer = { option?: string; custom?: string; skipped?: boolean };
 export type QuestionAnswer = { question: string; answer: string };
 
 export const ANALYSIS_STEPS = [
-  { id: 'dna', label: 'Understanding your video DNA', activity: 'Mapping pacing · tone · structure' },
+  { id: 'dna', label: 'Understanding your video DNA', activity: 'Mapping pacing, tone, and structure' },
+  { id: 'visuals', label: 'Understanding the visuals', activity: 'Reading composition, motion, and text' },
+  { id: 'scenes-audio', label: 'Understanding scenes and audio', activity: 'Listening for dialogue, music, and rhythm' },
   { id: 'hook', label: 'Finding the hook', activity: 'Detecting the opening attention trigger' },
-  { id: 'visuals', label: 'Creating the visuals', activity: 'Matching composition · motion · typography' },
   { id: 'patterns', label: 'Learning content patterns', activity: 'Connecting recurring creative decisions' },
-  { id: 'performance', label: 'Reading performance and signals', activity: 'Evaluating retention · rhythm · engagement' },
+  { id: 'performance', label: 'Reading performance signals', activity: 'Evaluating retention and engagement cues' },
 ] as const;
+
+const MAX_IN_PROGRESS_DISPLAY = 92;
+
+export function getNextAnalysisDisplayProgress(displayProgress: number, reportedProgress: number): number {
+  const boundedDisplay = Math.max(0, Math.min(100, Math.round(displayProgress)));
+  const boundedReported = Math.max(0, Math.min(100, Math.round(reportedProgress)));
+  if (boundedReported >= 100) return 100;
+  return Math.min(MAX_IN_PROGRESS_DISPLAY, Math.max(boundedReported, boundedDisplay + 1));
+}
 
 export function getAnalysisStepStates(activeStep: number): AnalysisStepState[] {
   const boundedActiveStep = Math.max(0, Math.min(ANALYSIS_STEPS.length - 1, activeStep));

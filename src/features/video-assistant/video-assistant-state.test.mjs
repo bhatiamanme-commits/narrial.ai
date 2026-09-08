@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ANALYSIS_STEPS, buildQuestionAnswerPayload, getAnalysisPresentation, getAnalysisStepIndex, getAnalysisStepStates, getVideoAssistantPhase } from './video-assistant-state.ts';
+import { ANALYSIS_STEPS, buildQuestionAnswerPayload, getAnalysisPresentation, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, getVideoAssistantPhase } from './video-assistant-state.ts';
 
 test('collects user options before starting video analysis', () => {
   assert.equal(getVideoAssistantPhase(false, 0), 'questions');
@@ -17,32 +17,42 @@ test('starts analysis only after the questions are complete', () => {
 test('describes the creative work the AI performs in order', () => {
   assert.deepEqual(ANALYSIS_STEPS.map((step) => step.label), [
     'Understanding your video DNA',
+    'Understanding the visuals',
+    'Understanding scenes and audio',
     'Finding the hook',
-    'Creating the visuals',
     'Learning content patterns',
-    'Reading performance and signals',
+    'Reading performance signals',
   ]);
   assert.deepEqual(ANALYSIS_STEPS.map((step) => step.activity), [
-    'Mapping pacing · tone · structure',
+    'Mapping pacing, tone, and structure',
+    'Reading composition, motion, and text',
+    'Listening for dialogue, music, and rhythm',
     'Detecting the opening attention trigger',
-    'Matching composition · motion · typography',
     'Connecting recurring creative decisions',
-    'Evaluating retention · rhythm · engagement',
+    'Evaluating retention and engagement cues',
   ]);
 });
 
 test('marks earlier analysis steps complete and the current step active', () => {
-  assert.deepEqual(getAnalysisStepStates(2), ['complete', 'complete', 'active', 'upcoming', 'upcoming']);
-  assert.deepEqual(getAnalysisStepStates(99), ['complete', 'complete', 'complete', 'complete', 'active']);
+  assert.deepEqual(getAnalysisStepStates(2), ['complete', 'complete', 'active', 'upcoming', 'upcoming', 'upcoming']);
+  assert.deepEqual(getAnalysisStepStates(99), ['complete', 'complete', 'complete', 'complete', 'complete', 'active']);
 });
 
 test('maps real job progress across every visible analysis step', () => {
   assert.equal(getAnalysisStepIndex(0), 0);
-  assert.equal(getAnalysisStepIndex(19), 0);
-  assert.equal(getAnalysisStepIndex(20), 1);
-  assert.equal(getAnalysisStepIndex(79), 3);
-  assert.equal(getAnalysisStepIndex(99), 4);
-  assert.equal(getAnalysisStepIndex(100), 4);
+  assert.equal(getAnalysisStepIndex(15), 0);
+  assert.equal(getAnalysisStepIndex(17), 1);
+  assert.equal(getAnalysisStepIndex(79), 4);
+  assert.equal(getAnalysisStepIndex(99), 5);
+  assert.equal(getAnalysisStepIndex(100), 5);
+});
+
+test('advances display progress smoothly without claiming completion', () => {
+  assert.equal(getNextAnalysisDisplayProgress(0, 0), 1);
+  assert.equal(getNextAnalysisDisplayProgress(12, 30), 30);
+  assert.equal(getNextAnalysisDisplayProgress(30, 30), 31);
+  assert.equal(getNextAnalysisDisplayProgress(92, 30), 92);
+  assert.equal(getNextAnalysisDisplayProgress(40, 100), 100);
 });
 
 test('builds one complete question and answer payload after collection', () => {

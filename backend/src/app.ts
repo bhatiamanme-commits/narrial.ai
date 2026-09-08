@@ -7,6 +7,8 @@ import Fastify, { LogController } from 'fastify';
 import type { AppConfig } from './config/env.js';
 import { registerYouTubeModule, type YouTubeModuleDependencies } from './youtube/http/plugin.js';
 import { registerVideoAnalysisModule, type VideoAnalysisModuleDependencies } from './video-analysis/http-plugin.js';
+import { registerStoryGenerationModule } from './story-generation/http-plugin.js';
+import type { StoryPlanner } from './story-generation/gemini-story-planner.js';
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -16,6 +18,7 @@ interface BuildAppOptions {
   oauthService?: YouTubeModuleDependencies['oauthService'];
   videoAnalysisRepository?: VideoAnalysisModuleDependencies['videoAnalysisRepository'];
   videoAnalysisWorker?: VideoAnalysisModuleDependencies['videoAnalysisWorker'];
+  storyPlanner?: StoryPlanner;
 }
 
 interface HandledError extends Error {
@@ -109,6 +112,7 @@ export function buildApp({
   oauthService,
   videoAnalysisRepository,
   videoAnalysisWorker,
+  storyPlanner,
 }: BuildAppOptions) {
   const logger =
     config.logLevel === 'silent'
@@ -175,6 +179,7 @@ export function buildApp({
   if (authenticationVerifier && videoAnalysisRepository && videoAnalysisWorker) {
     void registerVideoAnalysisModule(app, { authenticationVerifier, videoAnalysisRepository, videoAnalysisWorker });
   }
+  if (authenticationVerifier && storyPlanner) void registerStoryGenerationModule(app, { authenticationVerifier, storyPlanner });
 
   return app;
 }
