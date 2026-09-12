@@ -48,6 +48,14 @@ describe('loadConfig', () => {
       geminiApiKey: 'gemini-test-key',
       geminiVideoModel: 'gemini-3.8-flash',
       videoAnalysisTimeoutMs: 120_000,
+      videoAnalysisEnabled: true,
+      videoAnalysisMaxJobsPerHour: 10,
+      videoAnalysisGlobalMaxJobsPerHour: 100,
+      videoAnalysisMaxConcurrentJobs: 2,
+      scriptGenerationMaxJobsPerHour: 10,
+      scriptGenerationGlobalMaxJobsPerHour: 100,
+      scriptGenerationEnabled: true,
+      scriptGenerationMaxConcurrentJobs: 2,
       requestTimeoutMs: 10_000,
       handlerTimeoutMs: 5_000,
       keepAliveTimeoutMs: 5_000,
@@ -59,6 +67,27 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...validEnvironment, CLERK_SECRET_KEY: undefined }),
     ).toThrow('Invalid configuration fields: CLERK_SECRET_KEY');
+  });
+
+  it('rejects an invalid explicit script generation limit', () => {
+    expect(() => loadConfig({
+      ...validEnvironment,
+      SCRIPT_GENERATION_MAX_JOBS_PER_HOUR: '0',
+    })).toThrow('Invalid configuration fields: SCRIPT_GENERATION_MAX_JOBS_PER_HOUR');
+  });
+
+  it('rejects an invalid explicit worker concurrency limit', () => {
+    expect(() => loadConfig({
+      ...validEnvironment,
+      VIDEO_ANALYSIS_MAX_CONCURRENT_JOBS: '0',
+    })).toThrow('Invalid configuration fields: VIDEO_ANALYSIS_MAX_CONCURRENT_JOBS');
+  });
+
+  it('rejects an invalid operational kill-switch value', () => {
+    expect(() => loadConfig({
+      ...validEnvironment,
+      VIDEO_ANALYSIS_ENABLED: 'yes',
+    })).toThrow('Invalid configuration fields: VIDEO_ANALYSIS_ENABLED');
   });
 
   it('rejects an OAuth redirect URI with the wrong callback path', () => {

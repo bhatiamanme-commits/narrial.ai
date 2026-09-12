@@ -123,6 +123,13 @@ enum VideoAnalysisJobStatus {
   FAILED
 }
 
+enum ScriptGenerationJobStatus {
+  QUEUED
+  GENERATING
+  COMPLETE
+  FAILED
+}
+
 model VideoReference {
   id              String                 @id @db.Uuid
   narrialUserId   String                 @map("narrial_user_id") @db.VarChar(255)
@@ -137,6 +144,7 @@ model VideoReference {
 
   @@unique([id, narrialUserId])
   @@index([narrialUserId, createdAt(sort: Desc)])
+  @@index([narrialUserId, provider, providerVideoId, expiresAt])
   @@index([provider, providerVideoId])
   @@index([expiresAt])
   @@map("video_references")
@@ -152,10 +160,12 @@ model VideoAnalysisJob {
   attemptCount  Int                    @default(0) @map("attempt_count")
   errorCode     String?                @map("error_code") @db.VarChar(100)
   claimedAt     DateTime?              @map("claimed_at") @db.Timestamptz(6)
+  claimToken    String?                @map("claim_token") @db.Uuid
   createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
   reference     VideoReference         @relation(fields: [referenceId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
   result        VideoAnalysisResult?
+  scriptJobs    ScriptGenerationJob[]
 
   @@unique([id, narrialUserId])
   @@index([narrialUserId, status, createdAt(sort: Desc)])
@@ -180,6 +190,54 @@ model VideoAnalysisResult {
   @@index([narrialUserId, createdAt(sort: Desc)])
   @@index([expiresAt])
   @@map("video_analysis_results")
+}
+
+model ScriptGenerationJob {
+  id                 String                    @id @db.Uuid
+  narrialUserId      String                    @map("narrial_user_id") @db.VarChar(255)
+  analysisJobId      String                    @map("analysis_job_id") @db.Uuid
+  idempotencyKey     String                    @map("idempotency_key") @db.Uuid
+  requestFingerprint String                    @map("request_fingerprint") @db.Char(64)
+  prompt             String                    @db.VarChar(2000)
+  questionAnswers    Json                      @map("question_answers")
+  status             ScriptGenerationJobStatus @default(QUEUED)
+  progress           Int                       @default(0)
+  stage              String                    @db.VarChar(255)
+  attemptCount       Int                       @default(0) @map("attempt_count")
+  errorCode          String?                   @map("error_code") @db.VarChar(100)
+  claimedAt          DateTime?                 @map("claimed_at") @db.Timestamptz(6)
+  claimToken         String?                   @map("claim_token") @db.Uuid
+  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  analysisJob        VideoAnalysisJob          @relation(fields: [analysisJobId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
+  result             ScriptGenerationResult?
+
+  @@unique([id, narrialUserId])
+  @@unique([narrialUserId, idempotencyKey])
+  @@index([narrialUserId, createdAt])
+  @@index([narrialUserId, status, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("script_generation_jobs")
+}
+
+model ScriptGenerationResult {
+  id              String              @id @db.Uuid
+  narrialUserId   String              @map("narrial_user_id") @db.VarChar(255)
+  jobId           String              @unique @map("job_id") @db.Uuid
+  schemaVersion   Int                 @map("schema_version")
+  promptVersion   String              @map("prompt_version") @db.VarChar(100)
+  planner         String              @db.VarChar(100)
+  durationSeconds Int                 @map("duration_seconds")
+  story           Json
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt       DateTime            @map("expires_at") @db.Timestamptz(6)
+  job             ScriptGenerationJob @relation(fields: [jobId, narrialUserId], references: [id, narrialUserId], onDelete: Cascade)
+
+  @@unique([id, narrialUserId])
+  @@unique([jobId, narrialUserId])
+  @@index([narrialUserId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("script_generation_results")
 }
 
 model YouTubeConnection {

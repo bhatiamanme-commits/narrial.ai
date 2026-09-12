@@ -1,7 +1,7 @@
 export type VideoAssistantPhase = 'questions' | 'analyzing' | 'complete';
 export type AnalysisStepState = 'complete' | 'active' | 'upcoming';
-type QuestionDefinition = { id: string; title: string };
-type CollectedAnswer = { option?: string; custom?: string; skipped?: boolean };
+export type QuestionDefinition = { id: string; title: string; defaultOption?: string };
+export type CollectedAnswer = { option?: string; custom?: string; skipped?: boolean };
 export type QuestionAnswer = { question: string; answer: string };
 
 export const ANALYSIS_STEPS = [
@@ -44,6 +44,28 @@ export function buildQuestionAnswerPayload(questions: readonly QuestionDefinitio
       answer: answer?.skipped ? 'Not specified' : answer?.custom?.trim() || answer?.option || 'Not specified',
     };
   });
+}
+
+export function recordQuestionAdvance(
+  answers: Record<string, CollectedAnswer>,
+  question: QuestionDefinition,
+  action: 'next' | 'skip',
+): Record<string, CollectedAnswer> {
+  if (action === 'skip') return { ...answers, [question.id]: { skipped: true } };
+  const selectedAnswer = answers[question.id] ?? (question.defaultOption ? { option: question.defaultOption } : undefined);
+  return selectedAnswer ? { ...answers, [question.id]: selectedAnswer } : answers;
+}
+
+export function buildCompleteQuestionAnswerPayload(
+  questions: readonly QuestionDefinition[],
+  answers: Record<string, CollectedAnswer>,
+  additionalDirections: readonly string[],
+): QuestionAnswer[] {
+  const payload = buildQuestionAnswerPayload(questions, answers);
+  const additionalAnswer = additionalDirections.map((item) => item.trim()).filter(Boolean).join('\n');
+  return additionalAnswer
+    ? [...payload, { question: 'Additional creative direction', answer: additionalAnswer }]
+    : payload;
 }
 
 export function getVideoAssistantPhase(questionsComplete: boolean, analysisPercentage: number): VideoAssistantPhase {

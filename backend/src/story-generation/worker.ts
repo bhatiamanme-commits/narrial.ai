@@ -1,6 +1,9 @@
-import { parseVideoAnalysis, VideoAnalysisError } from './domain.js';
-import type { VideoAnalysisRepository, VideoAnalyzer } from './ports.js';
+import { VideoAnalysisError } from '../video-analysis/domain.js';
+import type { VideoAnalysisRepository } from '../video-analysis/ports.js';
 import { BoundedJobScheduler } from '../lifecycle/bounded-job-scheduler.js';
+import { parseGeneratedStory } from './domain.js';
+import type { StoryPlanner } from './gemini-story-planner.js';
+import type { ScriptGenerationRepository } from './ports.js';
 
 const DEFAULT_CLAIM_LEASE_MS = 20 * 60 * 1_000;
 const DEFAULT_RECOVERY_INTERVAL_MS = 5_000;
@@ -17,7 +20,15 @@ interface ActiveClaim {
   claimToken: string;
 }
 
-export class VideoAnalysisWorker {
+function safeFailureCode(error: unknown) {
+  if (error instanceof VideoAnalysisError) {
+    if (error.code === 'STORY_GENERATOR_UNAVAILABLE') return 'SCRIPT_PROVIDER_UNAVAILABLE';
+    if (error.code === 'INVALID_STORY') return 'INVALID_SCRIPT_OUTPUT';
+  }
+  return 'SCRIPT_GENERATION_FAILED';
+}
+
+export class ScriptGenerationWorker {
   private readonly scheduler: BoundedJobScheduler;
   private readonly claimLeaseMs: number;
   private readonly recoveryIntervalMs: number;
@@ -26,16 +37,17 @@ export class VideoAnalysisWorker {
   private recoveryTimer?: NodeJS.Timeout;
 
   constructor(
-    private readonly repository: VideoAnalysisRepository,
-    private readonly analyzer: VideoAnalyzer,
+    private readonly scripts: ScriptGenerationRepository,
+    private readonly videos: VideoAnalysisRepository,
+    private readonly planner: StoryPlanner,
     private readonly onUnexpectedError: (error: unknown) => void = () => undefined,
     options: WorkerOptions = {},
   ) {
     const maxConcurrentJobs = options.maxConcurrentJobs ?? 2;
     this.claimLeaseMs = options.claimLeaseMs ?? DEFAULT_CLAIM_LEASE_MS;
     this.recoveryIntervalMs = options.recoveryIntervalMs ?? DEFAULT_RECOVERY_INTERVAL_MS;
-    if (!Number.isSafeInteger(this.claimLeaseMs) || this.claimLeaseMs < 1_000) throw new Error('VIDEO_ANALYSIS_CLAIM_LEASE_INVALID');
-    if (!Number.isSafeInteger(this.recoveryIntervalMs) || this.recoveryIntervalMs < 1_000) throw new Error('VIDEO_ANALYSIS_RECOVERY_INTERVAL_INVALID');
+    if (!Number.isSafeInteger(this.claimLeaseMs) || this.claimLeaseMs < 1_000) throw new Error('SCRIPT_GENERATION_CLAIM_LEASE_INVALID');
+    if (!Number.isSafeInteger(this.recoveryIntervalMs) || this.recoveryIntervalMs < 1_000) throw new Error('SCRIPT_GENERATION_RECOVERY_INTERVAL_INVALID');
     this.recoveryBatchSize = maxConcurrentJobs * 3;
     this.scheduler = new BoundedJobScheduler(
       maxConcurrentJobs,
@@ -49,7 +61,7 @@ export class VideoAnalysisWorker {
   }
 
   async recover(limit = this.recoveryBatchSize): Promise<number> {
-    const jobs = await this.repository.findRecoverable(new Date(Date.now() - this.claimLeaseMs), limit);
+    const jobs = await this.scripts.findRecoverable(new Date(Date.now() - this.claimLeaseMs), limit);
     jobs.forEach(({ id, ownerId }) => this.runSoon(id, ownerId));
     return jobs.length;
   }
@@ -69,33 +81,32 @@ export class VideoAnalysisWorker {
     }
     const schedulerStop = this.scheduler.stop();
     const claimFailures = [...this.activeClaims.values()].map(({ jobId, ownerId, claimToken }) =>
-      this.repository.fail(jobId, ownerId, claimToken, 'WORKER_SHUTDOWN'),
+      this.scripts.fail(jobId, ownerId, claimToken, 'WORKER_SHUTDOWN'),
     );
     await Promise.allSettled([schedulerStop, ...claimFailures]);
   }
 
   async run(jobId: string, ownerId: string, signal?: AbortSignal): Promise<void> {
-    const job = await this.repository.claim(jobId, ownerId, new Date(Date.now() - this.claimLeaseMs));
+    const job = await this.scripts.claim(jobId, ownerId, new Date(Date.now() - this.claimLeaseMs));
     if (!job) return;
-    if (!job.claimToken) throw new Error('VIDEO_ANALYSIS_CLAIM_TOKEN_MISSING');
+    if (!job.claimToken) throw new Error('SCRIPT_GENERATION_CLAIM_TOKEN_MISSING');
     const activeKey = `${ownerId}:${jobId}`;
     const activeClaim = { jobId, ownerId, claimToken: job.claimToken };
     this.activeClaims.set(activeKey, activeClaim);
     try {
       if (signal?.aborted) {
-        await this.repository.fail(jobId, ownerId, job.claimToken, 'WORKER_SHUTDOWN');
+        await this.scripts.fail(jobId, ownerId, job.claimToken, 'WORKER_SHUTDOWN');
         return;
       }
-      const reference = await this.repository.findReferenceForUser(job.referenceId, ownerId);
-      if (!reference) {
-        await this.repository.fail(jobId, ownerId, job.claimToken, 'VIDEO_REFERENCE_NOT_FOUND');
+      const analysisJob = await this.videos.findJobForUser(job.analysisJobId, ownerId);
+      if (!analysisJob?.analysis || analysisJob.status !== 'COMPLETE') {
+        await this.scripts.fail(jobId, ownerId, job.claimToken, 'VIDEO_ANALYSIS_UNAVAILABLE');
         return;
       }
-      const analysis = parseVideoAnalysis(await this.analyzer.analyze(reference, signal));
-      await this.repository.complete(jobId, ownerId, job.claimToken, analysis);
+      const story = parseGeneratedStory(await this.planner.generate({ analysis: analysisJob.analysis, ...job.brief }, signal), analysisJob.analysis.durationSeconds);
+      await this.scripts.complete(jobId, ownerId, job.claimToken, story, analysisJob.analysis.durationSeconds);
     } catch (error) {
-      const code = error instanceof VideoAnalysisError ? error.code : 'VIDEO_ANALYSIS_FAILED';
-      await this.repository.fail(jobId, ownerId, job.claimToken, code);
+      await this.scripts.fail(jobId, ownerId, job.claimToken, safeFailureCode(error));
     } finally {
       if (this.activeClaims.get(activeKey)?.claimToken === job.claimToken) this.activeClaims.delete(activeKey);
     }

@@ -5,7 +5,7 @@ describe('GeminiStoryPlanner', () => {
   it('uses structural reference data without sending source dialogue', async () => {
     let requestBody = '';
     const fetcher: typeof fetch = (_url, init) => {
-      requestBody = String(init?.body ?? '');
+      requestBody = typeof init?.body === 'string' ? init.body : '';
       return Promise.resolve(new Response(JSON.stringify({ output_text: JSON.stringify({
         title: 'Original', hook: 'A fresh hook', story: 'A new story',
         scenes: [{ startSeconds: 0, endSeconds: 2, purpose: 'Hook', narration: 'New words', visual: 'New view', emotion: 'Curiosity' }, { startSeconds: 2, endSeconds: 5, purpose: 'Payoff', narration: 'New ending', visual: 'New result', emotion: 'Trust' }],

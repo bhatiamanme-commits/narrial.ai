@@ -20,6 +20,14 @@ export interface AppConfig {
   geminiApiKey: string;
   geminiVideoModel: string;
   videoAnalysisTimeoutMs: number;
+  videoAnalysisEnabled: boolean;
+  videoAnalysisMaxJobsPerHour: number;
+  videoAnalysisGlobalMaxJobsPerHour: number;
+  videoAnalysisMaxConcurrentJobs: number;
+  scriptGenerationMaxJobsPerHour: number;
+  scriptGenerationGlobalMaxJobsPerHour: number;
+  scriptGenerationEnabled: boolean;
+  scriptGenerationMaxConcurrentJobs: number;
   requestTimeoutMs: number;
   handlerTimeoutMs: number;
   keepAliveTimeoutMs: number;
@@ -43,6 +51,13 @@ function parseInteger(value: string | undefined, minimum: number, maximum: numbe
   return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum
     ? parsed
     : undefined;
+}
+
+function parseBoolean(value: string | undefined, defaultValue: boolean) {
+  if (value === undefined) return defaultValue;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
 }
 
 function parseOrigins(value: string | undefined) {
@@ -133,6 +148,26 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
   const geminiApiKey = environment.GEMINI_API_KEY?.trim() || undefined;
   const geminiVideoModel = environment.GEMINI_VIDEO_MODEL?.trim() || undefined;
   const videoAnalysisTimeoutMs = parseInteger(environment.VIDEO_ANALYSIS_TIMEOUT_MS, 1_000, 900_000);
+  const videoAnalysisEnabled = parseBoolean(environment.VIDEO_ANALYSIS_ENABLED, true);
+  const videoAnalysisMaxJobsPerHour = environment.VIDEO_ANALYSIS_MAX_JOBS_PER_HOUR === undefined
+    ? 10
+    : parseInteger(environment.VIDEO_ANALYSIS_MAX_JOBS_PER_HOUR, 1, 1_000);
+  const videoAnalysisGlobalMaxJobsPerHour = environment.VIDEO_ANALYSIS_GLOBAL_MAX_JOBS_PER_HOUR === undefined
+    ? 100
+    : parseInteger(environment.VIDEO_ANALYSIS_GLOBAL_MAX_JOBS_PER_HOUR, 1, 100_000);
+  const videoAnalysisMaxConcurrentJobs = environment.VIDEO_ANALYSIS_MAX_CONCURRENT_JOBS === undefined
+    ? 2
+    : parseInteger(environment.VIDEO_ANALYSIS_MAX_CONCURRENT_JOBS, 1, 100);
+  const scriptGenerationMaxJobsPerHour = environment.SCRIPT_GENERATION_MAX_JOBS_PER_HOUR === undefined
+    ? 10
+    : parseInteger(environment.SCRIPT_GENERATION_MAX_JOBS_PER_HOUR, 1, 1_000);
+  const scriptGenerationGlobalMaxJobsPerHour = environment.SCRIPT_GENERATION_GLOBAL_MAX_JOBS_PER_HOUR === undefined
+    ? 100
+    : parseInteger(environment.SCRIPT_GENERATION_GLOBAL_MAX_JOBS_PER_HOUR, 1, 100_000);
+  const scriptGenerationEnabled = parseBoolean(environment.SCRIPT_GENERATION_ENABLED, true);
+  const scriptGenerationMaxConcurrentJobs = environment.SCRIPT_GENERATION_MAX_CONCURRENT_JOBS === undefined
+    ? 2
+    : parseInteger(environment.SCRIPT_GENERATION_MAX_CONCURRENT_JOBS, 1, 100);
   const requestTimeoutMs = parseInteger(environment.REQUEST_TIMEOUT_MS, 1, 300_000);
   const handlerTimeoutMs = parseInteger(environment.HANDLER_TIMEOUT_MS, 1, 300_000);
   const keepAliveTimeoutMs = parseInteger(environment.KEEP_ALIVE_TIMEOUT_MS, 1, 300_000);
@@ -161,6 +196,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     GEMINI_API_KEY: geminiApiKey,
     GEMINI_VIDEO_MODEL: geminiVideoModel,
     VIDEO_ANALYSIS_TIMEOUT_MS: videoAnalysisTimeoutMs,
+    VIDEO_ANALYSIS_ENABLED: videoAnalysisEnabled,
+    VIDEO_ANALYSIS_MAX_JOBS_PER_HOUR: videoAnalysisMaxJobsPerHour,
+    VIDEO_ANALYSIS_GLOBAL_MAX_JOBS_PER_HOUR: videoAnalysisGlobalMaxJobsPerHour,
+    VIDEO_ANALYSIS_MAX_CONCURRENT_JOBS: videoAnalysisMaxConcurrentJobs,
+    SCRIPT_GENERATION_MAX_JOBS_PER_HOUR: scriptGenerationMaxJobsPerHour,
+    SCRIPT_GENERATION_GLOBAL_MAX_JOBS_PER_HOUR: scriptGenerationGlobalMaxJobsPerHour,
+    SCRIPT_GENERATION_ENABLED: scriptGenerationEnabled,
+    SCRIPT_GENERATION_MAX_CONCURRENT_JOBS: scriptGenerationMaxConcurrentJobs,
     REQUEST_TIMEOUT_MS: requestTimeoutMs,
     HANDLER_TIMEOUT_MS: handlerTimeoutMs,
     KEEP_ALIVE_TIMEOUT_MS: keepAliveTimeoutMs,
@@ -192,6 +235,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     geminiApiKey: geminiApiKey!,
     geminiVideoModel: geminiVideoModel!,
     videoAnalysisTimeoutMs: videoAnalysisTimeoutMs!,
+    videoAnalysisEnabled: videoAnalysisEnabled!,
+    videoAnalysisMaxJobsPerHour: videoAnalysisMaxJobsPerHour!,
+    videoAnalysisGlobalMaxJobsPerHour: videoAnalysisGlobalMaxJobsPerHour!,
+    videoAnalysisMaxConcurrentJobs: videoAnalysisMaxConcurrentJobs!,
+    scriptGenerationMaxJobsPerHour: scriptGenerationMaxJobsPerHour!,
+    scriptGenerationGlobalMaxJobsPerHour: scriptGenerationGlobalMaxJobsPerHour!,
+    scriptGenerationEnabled: scriptGenerationEnabled!,
+    scriptGenerationMaxConcurrentJobs: scriptGenerationMaxConcurrentJobs!,
     requestTimeoutMs: requestTimeoutMs!,
     handlerTimeoutMs: handlerTimeoutMs!,
     keepAliveTimeoutMs: keepAliveTimeoutMs!,

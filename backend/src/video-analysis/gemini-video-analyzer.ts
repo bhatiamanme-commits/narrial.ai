@@ -45,7 +45,7 @@ function parseJsonText(text: string): unknown {
 export class GeminiVideoAnalyzer implements VideoAnalyzer {
   constructor(private readonly config: GeminiConfig, private readonly fetcher: typeof fetch = fetch) {}
 
-  async analyze(reference: ParsedVideoReference): Promise<VideoAnalysis> {
+  async analyze(reference: ParsedVideoReference, signal?: AbortSignal): Promise<VideoAnalysis> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
     try {
@@ -59,7 +59,7 @@ export class GeminiVideoAnalyzer implements VideoAnalyzer {
             { type: 'text', text: ANALYSIS_PROMPT },
           ],
         }),
-        signal: controller.signal,
+        signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
       });
       if (!response.ok) throw new VideoAnalysisError('VIDEO_ANALYZER_UNAVAILABLE', 'The video analyzer is temporarily unavailable.');
       const text = extractText(await response.json() as unknown);

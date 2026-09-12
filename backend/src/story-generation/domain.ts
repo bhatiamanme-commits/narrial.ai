@@ -2,7 +2,16 @@ import { VideoAnalysisError, parseVideoAnalysis, type VideoAnalysis } from '../v
 
 export type StoryScene = { startSeconds: number; endSeconds: number; purpose: string; narration: string; visual: string; emotion: string };
 export type GeneratedStory = { schemaVersion: 1; title: string; hook: string; story: string; scenes: StoryScene[]; ending: string; originalityNote: string };
-export type StoryRequest = { analysis: VideoAnalysis; prompt: string; questionAnswers: Array<{ question: string; answer: string }> };
+export type StoryBrief = { prompt: string; questionAnswers: Array<{ question: string; answer: string }> };
+export type StoryRequest = StoryBrief & { analysis: VideoAnalysis };
+export type ScriptGenerationJobStatus = 'QUEUED' | 'GENERATING' | 'COMPLETE' | 'FAILED';
+
+export class ScriptGenerationError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = 'ScriptGenerationError';
+  }
+}
 
 function text(value: unknown, max: number): value is string { return typeof value === 'string' && value.trim().length > 0 && value.length <= max; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
@@ -13,6 +22,14 @@ export function parseStoryRequest(value: unknown): StoryRequest {
     throw new VideoAnalysisError('INVALID_STORY_REQUEST', 'Story input is invalid.');
   }
   return { analysis: parseVideoAnalysis(value.analysis), prompt: value.prompt.trim(), questionAnswers: value.questionAnswers as StoryRequest['questionAnswers'] };
+}
+
+export function parseStoryBrief(value: unknown): StoryBrief {
+  if (!record(value) || !text(value.prompt, 2_000) || !Array.isArray(value.questionAnswers) || value.questionAnswers.length > 12 ||
+      !value.questionAnswers.every((item) => record(item) && text(item.question, 300) && text(item.answer, 1_000))) {
+    throw new VideoAnalysisError('INVALID_STORY_REQUEST', 'Story input is invalid.');
+  }
+  return { prompt: value.prompt.trim(), questionAnswers: value.questionAnswers as StoryBrief['questionAnswers'] };
 }
 
 export function parseGeneratedStory(value: unknown, durationSeconds: number): GeneratedStory {
@@ -33,4 +50,3 @@ export function parseGeneratedStory(value: unknown, durationSeconds: number): Ge
   if (Math.abs(previousEnd - durationSeconds) > 0.01) throw new VideoAnalysisError('INVALID_STORY', 'Story scenes do not match the requested duration.');
   return { schemaVersion: 1, title: value.title, hook: value.hook, story: value.story, scenes, ending: value.ending, originalityNote: value.originalityNote };
 }
-

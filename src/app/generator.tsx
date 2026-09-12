@@ -1,4 +1,5 @@
 import { useAuth, useUser } from '@clerk/expo';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -46,6 +47,12 @@ export default function GeneratorScreen() {
 
   const generate = async () => {
     if (!prompt.trim()) return Alert.alert('Add a prompt', 'Describe the videos you want Narrial to create.');
+    if (!reference) {
+      return Alert.alert('Add a reference video', 'Paste a public YouTube link before generating a reference-based script.');
+    }
+    if (reference?.type === 'file') {
+      return Alert.alert('Upload is not connected yet', 'Use a public YouTube link for reference-based script generation. Device files will be enabled after secure object storage is connected.');
+    }
     setSubmitting(true);
     try {
       let analysisParams: { referenceId?: string; analysisJobId?: string } = {};
@@ -61,7 +68,7 @@ export default function GeneratorScreen() {
       router.push({
         pathname: '/video-assistant',
         params: {
-          prompt: prompt.trim(), videoCount, aspectRatio, ...analysisParams,
+          prompt: prompt.trim(), videoCount, aspectRatio, scriptSessionId: randomUUID(), ...analysisParams,
           ...(reference ? {
             referenceName: reference.name, referenceSource: reference.source,
             ...(reference.thumbnailSource ? { referenceThumbnailSource: reference.thumbnailSource } : {}),

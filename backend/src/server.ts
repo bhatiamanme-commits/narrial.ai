@@ -15,8 +15,11 @@ import { GoogleYouTubeChannelProvider } from './youtube/infrastructure/google/go
 import { CredentialVault, LocalCredentialKeyAdapter, ProductionCredentialKeyAdapter } from './youtube/infrastructure/security/credential-vault.js';
 import { GeminiVideoAnalyzer } from './video-analysis/gemini-video-analyzer.js';
 import { PrismaVideoAnalysisRepository } from './video-analysis/prisma-repository.js';
+import { VideoAnalysisRetentionWorker } from './video-analysis/retention-worker.js';
 import { VideoAnalysisWorker } from './video-analysis/worker.js';
 import { GeminiStoryPlanner } from './story-generation/gemini-story-planner.js';
+import { PrismaScriptGenerationRepository } from './story-generation/prisma-repository.js';
+import { ScriptGenerationWorker } from './story-generation/worker.js';
 
 try {
   const config = loadConfig(process.env);
@@ -39,13 +42,23 @@ try {
     });
   const credentialVault = new CredentialVault(keyAdapter);
   const videoAnalysisRepository = new PrismaVideoAnalysisRepository(prisma);
+  const videoAnalyzer = new GeminiVideoAnalyzer({
+    apiKey: config.geminiApiKey,
+    model: config.geminiVideoModel,
+    timeoutMs: config.videoAnalysisTimeoutMs,
+  });
   const videoAnalysisWorker = new VideoAnalysisWorker(
     videoAnalysisRepository,
-    new GeminiVideoAnalyzer({
-      apiKey: config.geminiApiKey,
-      model: config.geminiVideoModel,
-      timeoutMs: config.videoAnalysisTimeoutMs,
-    }),
+    videoAnalyzer,
+    () => process.stderr.write('Video analysis worker failed unexpectedly\n'),
+    {
+      maxConcurrentJobs: config.videoAnalysisMaxConcurrentJobs,
+      claimLeaseMs: config.videoAnalysisTimeoutMs + 60_000,
+    },
+  );
+  const retentionWorker = new VideoAnalysisRetentionWorker(
+    videoAnalysisRepository,
+    () => process.stderr.write('Video-analysis retention cleanup failed unexpectedly\n'),
   );
   const connectionStore = new PrismaOAuthConnectionStore(
     persistence,
@@ -70,6 +83,18 @@ try {
     new GoogleYouTubeChannelProvider(fetch, config.handlerTimeoutMs),
     connectionStore,
   ));
+  const storyPlanner = new GeminiStoryPlanner({ apiKey: config.geminiApiKey, model: config.geminiVideoModel, timeoutMs: config.videoAnalysisTimeoutMs });
+  const scriptGenerationRepository = new PrismaScriptGenerationRepository(prisma);
+  const scriptGenerationWorker = new ScriptGenerationWorker(
+    scriptGenerationRepository,
+    videoAnalysisRepository,
+    storyPlanner,
+    () => process.stderr.write('Script generation worker failed unexpectedly\n'),
+    {
+      maxConcurrentJobs: config.scriptGenerationMaxConcurrentJobs,
+      claimLeaseMs: config.videoAnalysisTimeoutMs + 60_000,
+    },
+  );
   const app = buildApp({
     config,
     authenticationVerifier,
@@ -77,10 +102,25 @@ try {
     oauthService,
     videoAnalysisRepository,
     videoAnalysisWorker,
-    storyPlanner: new GeminiStoryPlanner({ apiKey: config.geminiApiKey, model: config.geminiVideoModel, timeoutMs: config.videoAnalysisTimeoutMs }),
+    scriptGenerationRepository,
+    scriptGenerationWorker,
   });
-  app.addHook('onClose', async () => prisma.$disconnect());
+  app.addHook('onClose', async () => {
+    retentionWorker.stop();
+    await Promise.all([videoAnalysisWorker.stop(), scriptGenerationWorker.stop()]);
+    await prisma.$disconnect();
+  });
   registerShutdownHandlers(app, config.shutdownGracePeriodMs);
+  await retentionWorker.run();
+  if (config.videoAnalysisEnabled) {
+    await videoAnalysisWorker.recover();
+    videoAnalysisWorker.startRecovery();
+  }
+  if (config.scriptGenerationEnabled) {
+    await scriptGenerationWorker.recover();
+    scriptGenerationWorker.startRecovery();
+  }
+  retentionWorker.start();
   await app.listen({ host: config.host, port: config.port });
 } catch (error) {
   const message = error instanceof ConfigError ? error.message : 'Backend failed to start';

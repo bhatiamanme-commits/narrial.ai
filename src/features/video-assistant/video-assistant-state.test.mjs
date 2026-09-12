@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ANALYSIS_STEPS, buildQuestionAnswerPayload, getAnalysisPresentation, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, getVideoAssistantPhase } from './video-assistant-state.ts';
+import { ANALYSIS_STEPS, buildCompleteQuestionAnswerPayload, buildQuestionAnswerPayload, getAnalysisPresentation, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, getVideoAssistantPhase, recordQuestionAdvance } from './video-assistant-state.ts';
 
 test('collects user options before starting video analysis', () => {
   assert.equal(getVideoAssistantPhase(false, 0), 'questions');
@@ -38,6 +38,17 @@ test('marks earlier analysis steps complete and the current step active', () => 
   assert.deepEqual(getAnalysisStepStates(99), ['complete', 'complete', 'complete', 'complete', 'complete', 'active']);
 });
 
+test('includes free-form creative direction in the script-generation brief', () => {
+  assert.deepEqual(buildCompleteQuestionAnswerPayload(
+    [{ id: 'tone', title: 'What tone?' }],
+    { tone: { option: 'Inspiring' } },
+    ['Open quietly', 'End with a strong call to action'],
+  ), [
+    { question: 'What tone?', answer: 'Inspiring' },
+    { question: 'Additional creative direction', answer: 'Open quietly\nEnd with a strong call to action' },
+  ]);
+});
+
 test('maps real job progress across every visible analysis step', () => {
   assert.equal(getAnalysisStepIndex(0), 0);
   assert.equal(getAnalysisStepIndex(15), 0);
@@ -70,6 +81,14 @@ test('builds one complete question and answer payload after collection', () => {
     { question: 'What are you creating?', answer: 'Social reel' },
     { question: 'Who is this video for?', answer: 'New founders' },
     { question: 'What tone should the video have?', answer: 'Not specified' },
+  ]);
+});
+
+test('commits a displayed default answer when the user advances without selecting it', () => {
+  const answers = recordQuestionAdvance({}, { id: 'format', title: 'What are you creating?', defaultOption: 'Social reel' }, 'next');
+  assert.deepEqual(answers, { format: { option: 'Social reel' } });
+  assert.deepEqual(buildQuestionAnswerPayload([{ id: 'format', title: 'What are you creating?' }], answers), [
+    { question: 'What are you creating?', answer: 'Social reel' },
   ]);
 });
 

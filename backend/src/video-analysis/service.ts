@@ -6,12 +6,20 @@ export class VideoAnalysisService {
   constructor(
     private readonly repository: VideoAnalysisRepository,
     private readonly worker: VideoAnalysisWorker,
+    private readonly maxJobsPerHour: number,
+    private readonly globalMaxJobsPerHour: number,
+    private readonly enabled: boolean,
   ) {}
 
   async submit(ownerId: string, url: string) {
+    if (!this.enabled) throw new VideoAnalysisError('VIDEO_ANALYSIS_DISABLED', 'Video analysis is temporarily unavailable.');
     const parsed = parseVideoReferenceUrl(url);
-    const created = await this.repository.create(ownerId, parsed);
-    this.worker.runSoon(created.job.id, ownerId);
+    const created = await this.repository.create(ownerId, parsed, {
+      maxJobsPerHour: this.maxJobsPerHour,
+      globalMaxJobsPerHour: this.globalMaxJobsPerHour,
+      createdAfter: new Date(Date.now() - 60 * 60 * 1_000),
+    });
+    if (created.created || created.job.status === 'QUEUED') this.worker.runSoon(created.job.id, ownerId);
     return created;
   }
 
@@ -20,6 +28,7 @@ export class VideoAnalysisService {
   }
 
   async retry(ownerId: string, jobId: string) {
+    if (!this.enabled) throw new VideoAnalysisError('VIDEO_ANALYSIS_DISABLED', 'Video analysis is temporarily unavailable.');
     const job = await this.repository.retry(jobId, ownerId);
     if (job) this.worker.runSoon(job.id, ownerId);
     return job;

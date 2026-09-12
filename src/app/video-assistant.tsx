@@ -1,5 +1,6 @@
 import { useAuth } from '@clerk/expo';
-import { useLocalSearchParams } from 'expo-router';
+import { randomUUID } from 'expo-crypto';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -23,15 +24,46 @@ import { MediaReference } from '@/features/media-reference/media-reference';
 import { CreativeBriefCard } from '@/features/creative-brief/creative-brief-card';
 import { buildClarificationQuestions } from '@/features/creative-brief/creative-brief';
 import { getVideoAnalysisJob, retryVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
-import { ANALYSIS_STEPS, buildQuestionAnswerPayload, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress } from '@/features/video-assistant/video-assistant-state';
+import { ANALYSIS_STEPS, buildCompleteQuestionAnswerPayload, buildQuestionAnswerPayload, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, recordQuestionAdvance } from '@/features/video-assistant/video-assistant-state';
 import { ViralDnaCard } from '@/features/viral-dna/viral-dna-card';
-import { generateStory, GeneratedStory } from '@/features/story-generation/story-generation-client';
+import {
+  createScriptGenerationJob,
+  getScriptGenerationJob,
+  MAX_SCRIPT_ANSWER_LENGTH,
+  retryScriptGenerationJob,
+  ScriptGenerationClientError,
+  ScriptGenerationJob,
+  validateScriptGenerationBrief,
+} from '@/features/story-generation/story-generation-client';
+import { clearResumableScriptGenerationJob, loadResumableScriptGenerationJob, saveResumableScriptGenerationJob } from '@/features/story-generation/script-generation-resume';
 import { StoryCard } from '@/features/story-generation/story-card';
 
 const LIME = '#A8FF1A';
 const TEXT = '#F7F7F5';
 const MUTED = '#929692';
 const BORDER = 'rgba(255,255,255,0.18)';
+
+function scriptFailureMessage(errorCode?: string, attemptCount = 0) {
+  if (attemptCount >= 3) return 'Script generation reached its retry limit. Start a new script from the reference video.';
+  return errorCode === 'SCRIPT_PROVIDER_UNAVAILABLE'
+    ? 'The script service is temporarily unavailable. Please retry.'
+    : 'The script could not be generated. Please retry.';
+}
+
+type StoryRetryMode = 'create' | 'poll' | 'provider' | 'restore' | null;
+type FrozenScriptRequest = {
+  analysisJobId: string;
+  idempotencyKey: string;
+  prompt: string;
+  questionAnswers: { question: string; answer: string }[];
+  clientSessionId?: string;
+};
+
+function retryModeForError(error: unknown, fallback: Exclude<StoryRetryMode, null>): StoryRetryMode {
+  if (!(error instanceof ScriptGenerationClientError)) return fallback;
+  if (error.code === 'IDEMPOTENCY_KEY_REUSED' || (error.status >= 400 && error.status < 500 && error.status !== 429)) return null;
+  return fallback;
+}
 
 type Question = { id: string; title: string; support: string; options: string[]; customOption?: string; defaultOption?: string };
 const QUESTIONS: Question[] = [
@@ -44,15 +76,15 @@ const QUESTIONS: Question[] = [
 type Answer = { option?: string; custom?: string; skipped?: boolean };
 type GenerationInput = { prompt: string; videoCount: string; aspectRatio: string; reference?: MediaReference; referenceId?: string; analysisJobId?: string };
 type State = { index: number; questions: Question[]; answers: Record<string, Answer>; complete: boolean; generation: GenerationInput };
-type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'close' };
+type Action = { type: 'select'; option: string } | { type: 'custom'; value: string } | { type: 'next' } | { type: 'skip' } | { type: 'restore' };
 
 function reducer(state: State, action: Action): State {
   const question = state.questions[state.index];
-  if (action.type === 'close') return { ...state, complete: true };
+  if (action.type === 'restore') return { ...state, complete: true };
   if (action.type === 'select') return { ...state, answers: { ...state.answers, [question.id]: { option: action.option } } };
   if (action.type === 'custom') return { ...state, answers: { ...state.answers, [question.id]: { ...state.answers[question.id], custom: action.value } } };
   if (action.type === 'next' || action.type === 'skip') {
-    const answers = action.type === 'skip' ? { ...state.answers, [question.id]: { skipped: true } } : state.answers;
+    const answers = recordQuestionAdvance(state.answers, question, action.type);
     return state.index === state.questions.length - 1 ? { ...state, answers, complete: true } : { ...state, answers, index: state.index + 1 };
   }
   return state;
@@ -201,14 +233,14 @@ function OptionRow({ index, label, selected, onPress }: { index: number; label: 
   </Pressable>;
 }
 
-function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: State; dispatch: React.Dispatch<Action>; composerRef: React.RefObject<TextInput | null>; onAdvance: (action: 'next' | 'skip') => void }) {
+function QuestionSheet({ state, dispatch, composerRef, onAdvance, onDismiss }: { state: State; dispatch: React.Dispatch<Action>; composerRef: React.RefObject<TextInput | null>; onAdvance: (action: 'next' | 'skip') => void; onDismiss: () => void }) {
   const question = state.questions[state.index];
   const answer = state.answers[question.id] ?? (question.defaultOption ? { option: question.defaultOption } : {});
   const isCustom = answer.option === question.customOption;
   const valid = Boolean(answer.option && (!isCustom || answer.custom?.trim()));
   return <View style={styles.sheet}>
     <View style={styles.handle} />
-    <Pressable accessibilityRole="button" accessibilityLabel="Close questions" onPress={() => dispatch({ type: 'close' })} style={styles.closeButton}><Icon name="close" size={24} /></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Close questions" onPress={onDismiss} style={styles.closeButton}><Icon name="close" size={24} /></Pressable>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.questionScroll}>
       <Text style={styles.step}>QUESTION {state.index + 1} OF {state.questions.length}</Text>
       <Text accessibilityRole="header" style={styles.question}>{question.title}</Text>
@@ -225,8 +257,8 @@ function QuestionSheet({ state, dispatch, composerRef, onAdvance }: { state: Sta
 }
 
 export default function VideoAssistantScreen() {
-  const { getToken } = useAuth();
-  const params = useLocalSearchParams<{ referenceId?: string; analysisJobId?: string; referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; referenceMediaType?: 'image' | 'video'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
+  const { getToken, userId } = useAuth();
+  const params = useLocalSearchParams<{ referenceId?: string; analysisJobId?: string; scriptJobId?: string; scriptRequestId?: string; scriptSessionId?: string; referenceName?: string; referenceSource?: string; referenceThumbnailSource?: string; referenceType?: 'file' | 'url'; referenceMediaType?: 'image' | 'video'; prompt?: string; videoCount?: string; aspectRatio?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = height < 760;
   const composerRef = useRef<TextInput>(null);
@@ -237,11 +269,20 @@ export default function VideoAssistantScreen() {
   const [analysisRun, setAnalysisRun] = useState(0);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
-  const [story, setStory] = useState<GeneratedStory | null>(null);
+  const [scriptJob, setScriptJob] = useState<ScriptGenerationJob | null>(null);
   const [storyError, setStoryError] = useState('');
   const [storyLoading, setStoryLoading] = useState(false);
   const [storyAttempt, setStoryAttempt] = useState(0);
+  const [storyPollRun, setStoryPollRun] = useState(0);
+  const [storyRecoveryRun, setStoryRecoveryRun] = useState(0);
+  const [storyRetryMode, setStoryRetryMode] = useState<StoryRetryMode>(null);
+  const [storySubmissionStarted, setStorySubmissionStarted] = useState(false);
+  const [resumeCheckCompleteForUser, setResumeCheckCompleteForUser] = useState<string | null>(null);
+  const [scriptIdempotencyKey] = useState(() => /^[0-9a-f-]{36}$/i.test(params.scriptRequestId ?? '') ? params.scriptRequestId! : randomUUID());
   const storyRequested = useRef(false);
+  const frozenScriptRequest = useRef<FrozenScriptRequest | null>(null);
+  const resumeCheckedForUser = useRef<string | null>(null);
+  const story = scriptJob?.story ?? null;
   const reference = params.referenceName && params.referenceSource && (params.referenceType === 'file' || params.referenceType === 'url')
     ? { name: params.referenceName, source: params.referenceSource, thumbnailSource: params.referenceThumbnailSource, type: params.referenceType, mediaType: params.referenceMediaType === 'image' ? 'image' as const : 'video' as const }
     : undefined;
@@ -263,10 +304,39 @@ export default function VideoAssistantScreen() {
   const currentQuestion = state.questions[state.index];
   const answer = state.answers[currentQuestion.id] ?? (currentQuestion.defaultOption ? { option: currentQuestion.defaultOption } : {});
   const customActive = answer.option === currentQuestion.customOption;
+  const additionalDirectionLength = sentDetails.reduce((total, item, index) => total + item.trim().length + (index > 0 ? 1 : 0), 0);
+  const detailLimit = customActive ? MAX_SCRIPT_ANSWER_LENGTH : Math.max(0, MAX_SCRIPT_ANSWER_LENGTH - additionalDirectionLength - (sentDetails.length ? 1 : 0));
+  const composerDisabled = state.complete && (storyLoading || Boolean(scriptJob) || storySubmissionStarted);
   const answeredQuestions = state.questions.filter((question, index) => (index < state.index || state.complete) && Boolean(state.answers[question.id]));
   const answerMessages = answeredQuestions.length ? [buildQuestionAnswerPayload(answeredQuestions, state.answers)
     .map(({ question, answer }) => `${question}\n${answer}`)
     .join('\n\n')] : [];
+
+  useEffect(() => {
+    if (!userId || resumeCheckedForUser.current === userId) return;
+    resumeCheckedForUser.current = userId;
+    void (async () => {
+      const resumable = params.scriptJobId ? null : await loadResumableScriptGenerationJob(userId);
+      const resumeMatchesIncomingReference = !params.analysisJobId || resumable?.request.analysisJobId === params.analysisJobId;
+      const resumeMatchesIncomingSession = !params.scriptSessionId || resumable?.request.clientSessionId === params.scriptSessionId;
+      if (resumable && resumeMatchesIncomingReference && resumeMatchesIncomingSession) {
+        frozenScriptRequest.current = {
+          analysisJobId: resumable.request.analysisJobId,
+          idempotencyKey: resumable.request.idempotencyKey,
+          prompt: resumable.request.prompt,
+          questionAnswers: resumable.request.questionAnswers.map((answer) => ({ ...answer })),
+          ...(resumable.request.clientSessionId ? { clientSessionId: resumable.request.clientSessionId } : {}),
+        };
+        if (resumable.jobId) {
+          storyRequested.current = true;
+          router.setParams({ scriptJobId: resumable.jobId, scriptRequestId: resumable.request.idempotencyKey });
+        } else {
+          setStorySubmissionStarted(true);
+        }
+      }
+      setResumeCheckCompleteForUser(userId);
+    })();
+  }, [params.analysisJobId, params.scriptJobId, params.scriptSessionId, userId]);
 
   useEffect(() => {
     if (analysisJob?.status === 'FAILED' || percentage >= 100) return;
@@ -311,28 +381,171 @@ export default function VideoAssistantScreen() {
     if (percentage === 100 && !state.complete) AccessibilityInfo.announceForAccessibility(`Question ${state.index + 1} of ${state.questions.length}. ${currentQuestion.title}`);
   }, [currentQuestion.title, fade, percentage, state.complete, state.index, state.questions.length]);
   useEffect(() => {
-    if (!state.complete || !analysisJob?.analysis || storyRequested.current) return;
-    storyRequested.current = true; setStoryLoading(true); setStoryError('');
-    void (async () => { try {
-      const clerkToken = await getToken(); if (!clerkToken) throw new Error('Authentication required');
-      const questionAnswers = buildQuestionAnswerPayload(state.questions, state.answers);
-      setStory(await generateStory({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, analysis: analysisJob.analysis!, prompt: state.generation.prompt || 'Create a new story', questionAnswers }));
-    } catch (error) { setStoryError(error instanceof Error ? error.message : 'Story generation failed.'); }
-    finally { setStoryLoading(false); } })();
-  }, [analysisJob?.analysis, getToken, state.answers, state.complete, state.generation.prompt, state.questions, storyAttempt]);
-
-  const retryStory = () => {
-    storyRequested.current = false;
+    if (!params.scriptJobId || scriptJob) return;
+    storyRequested.current = true;
+    void (async () => {
+      setStorySubmissionStarted(true);
+      try {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Authentication required');
+        const recovered = await getScriptGenerationJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: params.scriptJobId! });
+        setScriptJob(recovered);
+        setStoryLoading(recovered.status === 'QUEUED' || recovered.status === 'GENERATING');
+        setStoryError(recovered.status === 'FAILED' ? scriptFailureMessage(recovered.errorCode, recovered.attemptCount) : '');
+        setStoryRetryMode(recovered.status === 'FAILED' && recovered.attemptCount < 3 ? 'provider' : null);
+        if (userId && frozenScriptRequest.current) {
+          void saveResumableScriptGenerationJob(userId, { jobId: recovered.id, request: frozenScriptRequest.current });
+        }
+        dispatch({ type: 'restore' });
+      } catch (error) {
+        storyRequested.current = false;
+        setStorySubmissionStarted(false);
+        if (error instanceof ScriptGenerationClientError && error.status === 404) {
+          frozenScriptRequest.current = null;
+          if (userId) void clearResumableScriptGenerationJob(userId);
+        }
+        setStoryLoading(false);
+        setStoryError(error instanceof Error ? error.message : 'Script generation could not be restored.');
+        setStoryRetryMode(retryModeForError(error, 'restore'));
+      }
+    })();
+  }, [getToken, params.scriptJobId, scriptJob, storyRecoveryRun, userId]);
+  useEffect(() => {
+    const analysisJobId = params.analysisJobId;
+    const resumableRequest = frozenScriptRequest.current;
+    const canCreateFromCompletedAnalysis = state.complete && analysisJob?.status === 'COMPLETE' && Boolean(analysisJobId);
+    if (!userId || resumeCheckCompleteForUser !== userId || storyRequested.current || (!resumableRequest && !canCreateFromCompletedAnalysis)) return;
+    const request = resumableRequest ?? (() => {
+      const questionAnswers = buildCompleteQuestionAnswerPayload(state.questions, state.answers, sentDetails);
+      const prompt = state.generation.prompt.trim() || 'Create a new original story';
+      const validationError = validateScriptGenerationBrief({ prompt, questionAnswers });
+      if (validationError) {
+        setStoryLoading(false);
+        setStoryError(validationError);
+        setStoryRetryMode(null);
+        return null;
+      }
+      const frozen = {
+        analysisJobId: analysisJobId!,
+        idempotencyKey: scriptIdempotencyKey,
+        prompt,
+        questionAnswers,
+        ...(params.scriptSessionId ? { clientSessionId: params.scriptSessionId } : {}),
+      };
+      frozenScriptRequest.current = frozen;
+      return frozen;
+    })();
+    if (!request) return;
+    storyRequested.current = true;
+    setStorySubmissionStarted(true);
+    setStoryLoading(true);
     setStoryError('');
-    setStoryAttempt((attempt) => attempt + 1);
+    setStoryRetryMode(null);
+    router.setParams({ scriptRequestId: request.idempotencyKey });
+    void (async () => { try {
+      await saveResumableScriptGenerationJob(userId, { request });
+      const clerkToken = await getToken(); if (!clerkToken) throw new Error('Authentication required');
+      const created = await createScriptGenerationJob({
+        apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+        clerkToken,
+        ...request,
+      });
+      setScriptJob(created);
+      setStoryLoading(created.status === 'QUEUED' || created.status === 'GENERATING');
+      setStoryError(created.status === 'FAILED' ? scriptFailureMessage(created.errorCode, created.attemptCount) : '');
+      setStoryRetryMode(created.status === 'FAILED' && created.attemptCount < 3 ? 'provider' : null);
+      router.setParams({ scriptJobId: created.id });
+      await saveResumableScriptGenerationJob(userId, { jobId: created.id, request });
+      if (!state.complete) dispatch({ type: 'restore' });
+    } catch (error) {
+      setStoryLoading(false);
+      setStoryError(error instanceof Error ? error.message : 'Story generation failed.');
+      setStoryRetryMode(retryModeForError(error, 'create'));
+    }
+    })();
+  }, [analysisJob?.status, getToken, params.analysisJobId, params.scriptSessionId, resumeCheckCompleteForUser, scriptIdempotencyKey, sentDetails, state.answers, state.complete, state.generation.prompt, state.questions, storyAttempt, userId]);
+  useEffect(() => {
+    if (!scriptJob || (scriptJob.status !== 'QUEUED' && scriptJob.status !== 'GENERATING')) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = () => void (async () => {
+      try {
+        const clerkToken = await getToken();
+        if (!clerkToken) throw new Error('Authentication required');
+        const nextJob = await getScriptGenerationJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: scriptJob.id });
+        if (!cancelled) {
+          setStoryLoading(nextJob.status === 'QUEUED' || nextJob.status === 'GENERATING');
+          setStoryError(nextJob.status === 'FAILED' ? scriptFailureMessage(nextJob.errorCode, nextJob.attemptCount) : '');
+          setStoryRetryMode(nextJob.status === 'FAILED' && nextJob.attemptCount < 3 ? 'provider' : null);
+          setScriptJob(nextJob);
+          if (nextJob.status === 'QUEUED' || nextJob.status === 'GENERATING') timer = setTimeout(poll, 2_000);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          if (userId && error instanceof ScriptGenerationClientError && error.status === 404) void clearResumableScriptGenerationJob(userId);
+          setStoryLoading(false);
+          setStoryError(error instanceof Error ? error.message : 'Script status could not be refreshed.');
+          setStoryRetryMode(retryModeForError(error, 'poll'));
+        }
+      }
+    })();
+    timer = setTimeout(poll, 2_000);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [getToken, scriptJob, storyPollRun, userId]);
+  useEffect(() => {
+    if (!story && !storyError) return;
+    const timer = setTimeout(() => conversationScrollRef.current?.scrollToEnd({ animated: true }), 120);
+    if (story) AccessibilityInfo.announceForAccessibility(`Your script is ready with ${story.scenes.length} scenes.`);
+    return () => clearTimeout(timer);
+  }, [story, storyError]);
+
+  const retryStory = async () => {
+    if (!storyRetryMode) return;
+    setStoryError('');
+    if (storyRetryMode === 'create') {
+      storyRequested.current = false;
+      setStoryAttempt((attempt) => attempt + 1);
+      return;
+    }
+    if (storyRetryMode === 'poll') {
+      setStoryLoading(true);
+      setStoryPollRun((run) => run + 1);
+      return;
+    }
+    if (storyRetryMode === 'restore') {
+      setStoryLoading(true);
+      setStoryRecoveryRun((run) => run + 1);
+      return;
+    }
+    if (!scriptJob || scriptJob.status === 'QUEUED' || scriptJob.status === 'GENERATING' || scriptJob.attemptCount >= 3) return;
+    try {
+      const clerkToken = await getToken();
+      if (!clerkToken) throw new Error('Authentication required');
+      setStoryLoading(true);
+      const retried = await retryScriptGenerationJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: scriptJob.id });
+      setScriptJob(retried);
+      setStoryLoading(retried.status === 'QUEUED' || retried.status === 'GENERATING');
+      setStoryError(retried.status === 'FAILED' ? scriptFailureMessage(retried.errorCode, retried.attemptCount) : '');
+      setStoryRetryMode(retried.status === 'FAILED' && retried.attemptCount < 3 ? 'provider' : null);
+    } catch (error) {
+      setStoryLoading(false);
+      setStoryError(error instanceof Error ? error.message : 'Script generation could not be retried.');
+      setStoryRetryMode(retryModeForError(error, 'provider'));
+    }
   };
 
   const onComposerChange = (value: string) => {
-    setDetails(value);
-    if (customActive) dispatch({ type: 'custom', value });
+    const boundedValue = value.slice(0, detailLimit);
+    setDetails(boundedValue);
+    if (customActive) dispatch({ type: 'custom', value: boundedValue });
   };
   const send = () => {
-    if (!details.trim()) return;
+    if (composerDisabled || !details.trim()) return;
+    if (customActive) {
+      dispatch({ type: 'custom', value: details });
+      setDetails('');
+      return;
+    }
     setSentDetails(items => [...items, details.trim()]);
     setDetails('');
   };
@@ -376,16 +589,16 @@ export default function VideoAssistantScreen() {
             {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {state.complete ? <CreativeBriefCard prompt={state.generation.prompt} aspectRatio={state.generation.aspectRatio} answers={state.answers} /> : null}
-            {storyLoading ? <View style={styles.analysisPill}><LoadingCircle /><Text style={styles.analysisText}>Writing a new original story…</Text></View> : null}
-            {storyError ? <View style={styles.analysisPill}><Text style={styles.analysisText}>{storyError}</Text><Pressable accessibilityRole="button" onPress={retryStory} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable></View> : null}
+            {storyLoading ? <View style={styles.analysisPill}><LoadingCircle /><Text style={styles.analysisText}>{scriptJob ? `${scriptJob.stage} (${scriptJob.progress}%)` : 'Starting script generation…'}</Text></View> : null}
+            {storyError ? <View style={styles.analysisPill}><Text style={styles.analysisText}>{storyError}</Text>{storyRetryMode ? <Pressable accessibilityRole="button" onPress={() => void retryStory()} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}</View> : null}
             {story ? <StoryCard story={story} /> : null}
           </View>
-          {percentage >= 100 && analysisJob?.status !== 'FAILED' && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} onAdvance={advanceQuestion} /></Animated.View> : null}
+          {percentage >= 100 && analysisJob?.status !== 'FAILED' && !state.complete ? <Animated.View style={{ opacity: fade }}><QuestionSheet state={state} dispatch={dispatch} composerRef={composerRef} onAdvance={advanceQuestion} onDismiss={() => router.back()} /></Animated.View> : null}
         </ScrollView>
         <View style={styles.composer}>
           <Pressable accessibilityRole="button" accessibilityLabel="Add attachment" onPress={() => AccessibilityInfo.announceForAccessibility('Upload file, add reference image, or add another video.')} style={styles.plusButton}><Icon name="plus" size={28} /></Pressable>
-          <TextInput ref={composerRef} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={styles.composerInput} />
-          <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: !details.trim() }} disabled={!details.trim()} onPress={send} style={({ pressed }) => [styles.sendButton, !details.trim() && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
+          <TextInput ref={composerRef} editable={!composerDisabled && detailLimit > 0} maxLength={detailLimit} value={details} onChangeText={onComposerChange} onSubmitEditing={send} returnKeyType="send" placeholder={customActive ? 'Describe your preference.' : 'Add more details'} placeholderTextColor={MUTED} style={[styles.composerInput, (composerDisabled || detailLimit === 0) && styles.composerInputDisabled]} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Send details" accessibilityState={{ disabled: composerDisabled || !details.trim() || detailLimit === 0 }} disabled={composerDisabled || !details.trim() || detailLimit === 0} onPress={send} style={({ pressed }) => [styles.sendButton, (composerDisabled || !details.trim() || detailLimit === 0) && { opacity: .62 }, pressed && styles.pressed]}><Icon name="send" color="#000" size={23} /></Pressable>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -441,5 +654,5 @@ const styles = StyleSheet.create({
   option: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,.28)', backgroundColor: 'rgba(20,20,20,.72)' }, optionSelected: { borderColor: LIME, backgroundColor: 'rgba(168,255,26,.08)' },
   numberBadge: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1, borderColor: '#777' }, numberSelected: { borderColor: LIME }, numberText: { color: '#C8C8C8', fontSize: 14 }, numberTextSelected: { color: LIME }, optionLabel: { flex: 1, color: TEXT, fontSize: 16, fontWeight: '600' }, radio: { width: 27, height: 27, borderRadius: 14, borderWidth: 1.5, borderColor: '#777' }, radioSelected: { alignItems: 'center', justifyContent: 'center', borderColor: LIME, backgroundColor: LIME },
   footer: { minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER }, skipButton: { minWidth: 54, minHeight: 44, justifyContent: 'center' }, skipText: { color: MUTED, fontSize: 16 }, nextButton: { minWidth: 116, minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11, borderRadius: 17, backgroundColor: LIME }, nextText: { color: '#000', fontSize: 17, fontWeight: '800' }, disabled: { opacity: .34 },
-  composer: { height: 66, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 7, borderRadius: 33, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.96)' }, plusButton: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: '#2B2B2B' }, composerInput: { flex: 1, minWidth: 0, color: TEXT, fontSize: 15 }, sendButton: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: LIME }, pressed: { opacity: .72, transform: [{ scale: .985 }] },
+  composer: { height: 66, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 7, borderRadius: 33, borderWidth: 1, borderColor: BORDER, backgroundColor: 'rgba(15,15,15,.96)' }, plusButton: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: '#2B2B2B' }, composerInput: { flex: 1, minWidth: 0, color: TEXT, fontSize: 15 }, composerInputDisabled: { opacity: .58 }, sendButton: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: LIME }, pressed: { opacity: .72, transform: [{ scale: .985 }] },
 });

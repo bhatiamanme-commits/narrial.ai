@@ -10,6 +10,9 @@ export interface VideoAnalysisModuleDependencies {
   authenticationVerifier: AuthenticationVerifier;
   videoAnalysisRepository: VideoAnalysisRepository;
   videoAnalysisWorker: VideoAnalysisWorker;
+  maxJobsPerHour: number;
+  globalMaxJobsPerHour: number;
+  enabled: boolean;
 }
 
 const identifierSchema = { type: 'string', format: 'uuid' } as const;
@@ -41,7 +44,13 @@ function serializeJob(job: Awaited<ReturnType<VideoAnalysisService['getJob']>> &
 }
 
 export async function registerVideoAnalysisModule(app: FastifyInstance, dependencies: VideoAnalysisModuleDependencies) {
-  const service = new VideoAnalysisService(dependencies.videoAnalysisRepository, dependencies.videoAnalysisWorker);
+  const service = new VideoAnalysisService(
+    dependencies.videoAnalysisRepository,
+    dependencies.videoAnalysisWorker,
+    dependencies.maxJobsPerHour,
+    dependencies.globalMaxJobsPerHour,
+    dependencies.enabled,
+  );
 
   await app.register((module, _options, done) => {
     module.post<{ Body: { url: string } }>('/api/v1/video-references', {
@@ -60,7 +69,8 @@ export async function registerVideoAnalysisModule(app: FastifyInstance, dependen
         }, requestId: request.id });
       } catch (error) {
         if (error instanceof VideoAnalysisError) {
-          return reply.code(422).send({ error: { code: error.code, message: error.message }, requestId: request.id });
+          const statusCode = error.code === 'VIDEO_ANALYSIS_RATE_LIMITED' || error.code === 'VIDEO_ANALYSIS_CAPACITY_LIMITED' ? 429 : error.code === 'VIDEO_ANALYSIS_DISABLED' ? 503 : 422;
+          return reply.code(statusCode).send({ error: { code: error.code, message: error.message }, requestId: request.id });
         }
         throw error;
       }
@@ -81,9 +91,17 @@ export async function registerVideoAnalysisModule(app: FastifyInstance, dependen
     }, async (request, reply) => {
       const user = await authenticate(request, reply, dependencies.authenticationVerifier);
       if (!user) return;
-      const job = await service.retry(user.userId, request.params.jobId);
-      if (!job) return reply.code(409).send({ error: { code: 'VIDEO_ANALYSIS_NOT_RETRYABLE', message: 'Video analysis cannot be retried' }, requestId: request.id });
-      return reply.code(202).send({ data: serializeJob(job), requestId: request.id });
+      try {
+        const job = await service.retry(user.userId, request.params.jobId);
+        if (!job) return reply.code(409).send({ error: { code: 'VIDEO_ANALYSIS_NOT_RETRYABLE', message: 'Video analysis cannot be retried' }, requestId: request.id });
+        return reply.code(202).send({ data: serializeJob(job), requestId: request.id });
+      } catch (error) {
+        if (error instanceof VideoAnalysisError) {
+          const statusCode = error.code === 'VIDEO_ANALYSIS_DISABLED' ? 503 : 422;
+          return reply.code(statusCode).send({ error: { code: error.code, message: error.message }, requestId: request.id });
+        }
+        throw error;
+      }
     });
 
     module.delete<{ Params: { referenceId: string } }>('/api/v1/video-references/:referenceId', {

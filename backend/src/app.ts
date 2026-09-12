@@ -8,7 +8,8 @@ import type { AppConfig } from './config/env.js';
 import { registerYouTubeModule, type YouTubeModuleDependencies } from './youtube/http/plugin.js';
 import { registerVideoAnalysisModule, type VideoAnalysisModuleDependencies } from './video-analysis/http-plugin.js';
 import { registerStoryGenerationModule } from './story-generation/http-plugin.js';
-import type { StoryPlanner } from './story-generation/gemini-story-planner.js';
+import type { ScriptGenerationRepository } from './story-generation/ports.js';
+import type { ScriptGenerationWorker } from './story-generation/worker.js';
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -18,7 +19,8 @@ interface BuildAppOptions {
   oauthService?: YouTubeModuleDependencies['oauthService'];
   videoAnalysisRepository?: VideoAnalysisModuleDependencies['videoAnalysisRepository'];
   videoAnalysisWorker?: VideoAnalysisModuleDependencies['videoAnalysisWorker'];
-  storyPlanner?: StoryPlanner;
+  scriptGenerationRepository?: ScriptGenerationRepository;
+  scriptGenerationWorker?: ScriptGenerationWorker;
 }
 
 interface HandledError extends Error {
@@ -112,7 +114,8 @@ export function buildApp({
   oauthService,
   videoAnalysisRepository,
   videoAnalysisWorker,
-  storyPlanner,
+  scriptGenerationRepository,
+  scriptGenerationWorker,
 }: BuildAppOptions) {
   const logger =
     config.logLevel === 'silent'
@@ -177,9 +180,26 @@ export function buildApp({
     });
   }
   if (authenticationVerifier && videoAnalysisRepository && videoAnalysisWorker) {
-    void registerVideoAnalysisModule(app, { authenticationVerifier, videoAnalysisRepository, videoAnalysisWorker });
+    void registerVideoAnalysisModule(app, {
+      authenticationVerifier,
+      videoAnalysisRepository,
+      videoAnalysisWorker,
+      maxJobsPerHour: config.videoAnalysisMaxJobsPerHour,
+      globalMaxJobsPerHour: config.videoAnalysisGlobalMaxJobsPerHour,
+      enabled: config.videoAnalysisEnabled,
+    });
   }
-  if (authenticationVerifier && storyPlanner) void registerStoryGenerationModule(app, { authenticationVerifier, storyPlanner });
+  if (authenticationVerifier && videoAnalysisRepository && scriptGenerationRepository && scriptGenerationWorker) {
+    void registerStoryGenerationModule(app, {
+      authenticationVerifier,
+      videoAnalysisRepository,
+      scriptGenerationRepository,
+      scriptGenerationWorker,
+      maxJobsPerHour: config.scriptGenerationMaxJobsPerHour,
+      globalMaxJobsPerHour: config.scriptGenerationGlobalMaxJobsPerHour,
+      enabled: config.scriptGenerationEnabled,
+    });
+  }
 
   return app;
 }
