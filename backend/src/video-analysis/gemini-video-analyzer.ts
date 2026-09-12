@@ -12,6 +12,61 @@ Use this exact shape:
 {"summary":"string","durationSeconds":number,"language":"optional string","subjects":[{"label":"string","description":"string"}],"scenes":[{"startSeconds":number,"endSeconds":number,"description":"string","shotType":"optional string","cameraMovement":"optional string","transition":"optional string","onScreenText":["optional string"],"spokenContent":"optional string"}],"creativeDNA":{"openingHook":"string","narrativeStructure":"string","pacing":"string","visualStyle":["string"],"colorMood":["string"],"editingPatterns":["string"],"audioStyle":"string","callToAction":"optional string"},"reusableInsights":["string"],"safetyFlags":["string"]}.
 Use seconds for timestamps. Separate observed facts from creative interpretation. Describe reusable patterns without asking to copy protected characters, brands, music, or exact creative expression.`;
 
+const ANALYSIS_RESPONSE_FORMAT = {
+  type: 'text',
+  mime_type: 'application/json',
+  schema: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string' },
+      durationSeconds: { type: 'number' },
+      language: { type: 'string' },
+      subjects: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { label: { type: 'string' }, description: { type: 'string' } },
+          required: ['label', 'description'],
+        },
+      },
+      scenes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            startSeconds: { type: 'number' },
+            endSeconds: { type: 'number' },
+            description: { type: 'string' },
+            shotType: { type: 'string' },
+            cameraMovement: { type: 'string' },
+            transition: { type: 'string' },
+            onScreenText: { type: 'array', items: { type: 'string' } },
+            spokenContent: { type: 'string' },
+          },
+          required: ['startSeconds', 'endSeconds', 'description'],
+        },
+      },
+      creativeDNA: {
+        type: 'object',
+        properties: {
+          openingHook: { type: 'string' },
+          narrativeStructure: { type: 'string' },
+          pacing: { type: 'string' },
+          visualStyle: { type: 'array', items: { type: 'string' } },
+          colorMood: { type: 'array', items: { type: 'string' } },
+          editingPatterns: { type: 'array', items: { type: 'string' } },
+          audioStyle: { type: 'string' },
+          callToAction: { type: 'string' },
+        },
+        required: ['openingHook', 'narrativeStructure', 'pacing', 'visualStyle', 'colorMood', 'editingPatterns', 'audioStyle'],
+      },
+      reusableInsights: { type: 'array', items: { type: 'string' } },
+      safetyFlags: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['summary', 'durationSeconds', 'subjects', 'scenes', 'creativeDNA', 'reusableInsights', 'safetyFlags'],
+  },
+} as const;
+
 function extractText(value: unknown): string | null {
   if (typeof value === 'string') return value;
   if (!value || typeof value !== 'object') return null;
@@ -55,9 +110,11 @@ export class GeminiVideoAnalyzer implements VideoAnalyzer {
         body: JSON.stringify({
           model: this.config.model,
           input: [
-            { type: 'video', uri: reference.canonicalUrl },
             { type: 'text', text: ANALYSIS_PROMPT },
+            { type: 'video', uri: reference.canonicalUrl },
           ],
+          response_format: ANALYSIS_RESPONSE_FORMAT,
+          store: false,
         }),
         signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
       });

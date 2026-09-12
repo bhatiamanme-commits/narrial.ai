@@ -24,9 +24,17 @@ describe('GeminiVideoAnalyzer', () => {
     });
 
     expect(analysis.summary).toBe(validAnalysis.summary);
-    const body = JSON.parse(requestBody) as { model: string; input: Array<{ type: string; uri?: string }> };
+    const body = JSON.parse(requestBody) as {
+      model: string;
+      input: Array<{ type: string; uri?: string }>;
+      response_format?: { type?: string; mime_type?: string; schema?: { type?: string } };
+      store?: boolean;
+    };
     expect(body.model).toBe('gemini-test');
-    expect(body.input[0]).toEqual({ type: 'video', uri: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+    expect(body.input[0]).toEqual({ type: 'text', text: expect.any(String) });
+    expect(body.input[1]).toEqual({ type: 'video', uri: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+    expect(body.response_format).toMatchObject({ type: 'text', mime_type: 'application/json', schema: { type: 'object' } });
+    expect(body.store).toBe(false);
   });
 
   it('sanitizes provider errors and malformed output', async () => {
