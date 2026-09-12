@@ -48,6 +48,27 @@ async function waitFor(assertion: () => void | Promise<void>, timeoutMs = 250) {
 }
 
 describe('VideoAnalysisWorker', () => {
+  it('creates a fresh job when a prior analysis exhausted its retry budget', async () => {
+    const repository = new InMemoryVideoAnalysisRepository();
+    const reference = parseVideoReferenceUrl('https://youtu.be/dQw4w9WgXcQ');
+    const quota = { maxJobsPerHour: 10, globalMaxJobsPerHour: 100, createdAfter: new Date(0) };
+    const original = await repository.create('owner-a', reference, quota);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const claimed = await repository.claim(original.job.id, 'owner-a', new Date(0));
+      expect(claimed?.claimToken).toBeDefined();
+      await repository.fail(original.job.id, 'owner-a', claimed!.claimToken!, 'INVALID_ANALYSIS');
+      if (attempt < 2) expect(await repository.retry(original.job.id, 'owner-a')).not.toBeNull();
+    }
+
+    const resubmitted = await repository.create('owner-a', reference, quota);
+
+    expect(resubmitted.created).toBe(true);
+    expect(resubmitted.reference.id).toBe(original.reference.id);
+    expect(resubmitted.job.id).not.toBe(original.job.id);
+    expect(resubmitted.job).toMatchObject({ status: 'QUEUED', attemptCount: 0 });
+  });
+
   it('claims a queued analysis atomically and does not call the analyzer twice', async () => {
     const repository = new InMemoryVideoAnalysisRepository();
     const created = await repository.create('owner-a', parseVideoReferenceUrl('https://youtu.be/dQw4w9WgXcQ'), { maxJobsPerHour: 10, globalMaxJobsPerHour: 100, createdAfter: new Date(0) });

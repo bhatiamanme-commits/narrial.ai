@@ -29,9 +29,12 @@ export class PrismaVideoAnalysisRepository implements VideoAnalysisRepository {
         const existingJob = await tx.videoAnalysisJob.findFirst({
           where: { referenceId: existingReference.id, narrialUserId: ownerId },
           orderBy: { createdAt: 'desc' },
-          select: { id: true },
+          select: { id: true, status: true, attemptCount: true },
         });
-        if (existingJob) return { referenceId: existingReference.id, jobId: existingJob.id, created: false };
+        const retryBudgetExhausted = existingJob?.status === 'FAILED' && existingJob.attemptCount >= 3;
+        if (existingJob && !retryBudgetExhausted) {
+          return { referenceId: existingReference.id, jobId: existingJob.id, created: false };
+        }
       }
       const recentlyCreated = await tx.videoAnalysisJob.count({
         where: { narrialUserId: ownerId, createdAt: { gte: quota.createdAfter } },
@@ -45,14 +48,16 @@ export class PrismaVideoAnalysisRepository implements VideoAnalysisRepository {
       if (globalRecentJobCount >= quota.globalMaxJobsPerHour) {
         throw new VideoAnalysisError('VIDEO_ANALYSIS_CAPACITY_LIMITED', 'Video analysis is temporarily at capacity. Please try again later.');
       }
-      const referenceId = randomUUID();
+      const referenceId = existingReference?.id ?? randomUUID();
       const jobId = randomUUID();
-      await tx.videoReference.create({ data: {
-        id: referenceId, narrialUserId: ownerId, provider: input.provider,
-        providerVideoId: input.providerVideoId, canonicalUrl: input.canonicalUrl,
-        title: input.title, thumbnailUrl: input.thumbnailUrl,
-        expiresAt: new Date(now.getTime() + RETENTION_MS),
-      } });
+      if (!existingReference) {
+        await tx.videoReference.create({ data: {
+          id: referenceId, narrialUserId: ownerId, provider: input.provider,
+          providerVideoId: input.providerVideoId, canonicalUrl: input.canonicalUrl,
+          title: input.title, thumbnailUrl: input.thumbnailUrl,
+          expiresAt: new Date(now.getTime() + RETENTION_MS),
+        } });
+      }
       await tx.videoAnalysisJob.create({ data: {
         id: jobId, narrialUserId: ownerId, referenceId, status: 'QUEUED', progress: 0,
         stage: 'Queued for analysis', createdAt: now, updatedAt: now,

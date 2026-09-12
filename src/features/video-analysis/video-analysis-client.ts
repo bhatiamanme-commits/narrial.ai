@@ -37,6 +37,18 @@ export type SubmittedVideoReference = {
 
 type ApiInput = { apiUrl: string; clerkToken: string; fetch?: typeof fetch };
 
+export class VideoAnalysisClientError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status: number, code: string) {
+    super(message);
+    this.name = 'VideoAnalysisClientError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -66,12 +78,18 @@ function parseJob(value: unknown): VideoAnalysisJob {
   return job;
 }
 
-async function parseApiError(response: Response): Promise<Error> {
+async function parseApiError(response: Response): Promise<VideoAnalysisClientError> {
   try {
-    const body = await response.json() as { error?: { message?: unknown } };
-    if (typeof body.error?.message === 'string') return new Error(body.error.message);
+    const body = await response.json() as { error?: { code?: unknown; message?: unknown } };
+    if (typeof body.error?.message === 'string') {
+      return new VideoAnalysisClientError(
+        body.error.message,
+        response.status,
+        typeof body.error.code === 'string' ? body.error.code : 'VIDEO_ANALYSIS_REQUEST_FAILED',
+      );
+    }
   } catch { /* use stable fallback */ }
-  return new Error('Video analysis request failed.');
+  return new VideoAnalysisClientError('Video analysis request failed.', response.status, 'VIDEO_ANALYSIS_REQUEST_FAILED');
 }
 
 function requestBase(input: ApiInput) {
@@ -114,4 +132,24 @@ export async function retryVideoAnalysisJob(input: ApiInput & { jobId: string })
   if (!response.ok) throw await parseApiError(response);
   const value: unknown = await response.json();
   return parseJob(isRecord(value) ? value.data : undefined);
+}
+
+export async function retryOrRestartVideoAnalysisJob(input: ApiInput & { jobId: string; url?: string }): Promise<{
+  analysisJob: VideoAnalysisJob;
+  referenceId: string;
+  restarted: boolean;
+}> {
+  try {
+    const analysisJob = await retryVideoAnalysisJob(input);
+    return { analysisJob, referenceId: analysisJob.referenceId, restarted: false };
+  } catch (error) {
+    if (!(error instanceof VideoAnalysisClientError) || error.code !== 'VIDEO_ANALYSIS_NOT_RETRYABLE' || !input.url) throw error;
+    const restarted = await submitVideoReference({
+      apiUrl: input.apiUrl,
+      clerkToken: input.clerkToken,
+      url: input.url,
+      ...(input.fetch ? { fetch: input.fetch } : {}),
+    });
+    return { analysisJob: restarted.analysisJob, referenceId: restarted.reference.id, restarted: true };
+  }
 }

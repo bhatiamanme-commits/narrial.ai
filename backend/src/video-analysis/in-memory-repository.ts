@@ -16,8 +16,11 @@ export class InMemoryVideoAnalysisRepository implements VideoAnalysisRepository 
       reference.providerVideoId === input.providerVideoId && reference.expiresAt > now,
     );
     if (existingReference) {
-      const existingJob = [...this.jobs.values()].find((job) => job.referenceId === existingReference.id && job.ownerId === ownerId);
-      if (existingJob) return Promise.resolve({ reference: structuredClone(existingReference), job: structuredClone(existingJob), created: false });
+      const existingJob = [...this.jobs.values()].reverse().find((job) => job.referenceId === existingReference.id && job.ownerId === ownerId);
+      const retryBudgetExhausted = existingJob?.status === 'FAILED' && existingJob.attemptCount >= 3;
+      if (existingJob && !retryBudgetExhausted) {
+        return Promise.resolve({ reference: structuredClone(existingReference), job: structuredClone(existingJob), created: false });
+      }
     }
     const recentJobCount = [...this.jobs.values()].filter(
       (job) => job.ownerId === ownerId && job.createdAt >= quota.createdAfter,
@@ -31,12 +34,12 @@ export class InMemoryVideoAnalysisRepository implements VideoAnalysisRepository 
     if (globalRecentJobCount >= quota.globalMaxJobsPerHour) {
       throw new VideoAnalysisError('VIDEO_ANALYSIS_CAPACITY_LIMITED', 'Video analysis is temporarily at capacity. Please try again later.');
     }
-    const reference = { ...input, id: randomUUID(), ownerId, createdAt: now, expiresAt: new Date(now.getTime() + RETENTION_MS) };
+    const reference = existingReference ?? { ...input, id: randomUUID(), ownerId, createdAt: now, expiresAt: new Date(now.getTime() + RETENTION_MS) };
     const job: VideoAnalysisJobRecord = {
       id: randomUUID(), ownerId, referenceId: reference.id, status: 'QUEUED', progress: 0,
       stage: 'Queued for analysis', attemptCount: 0, createdAt: now, updatedAt: now,
     };
-    this.references.set(reference.id, reference);
+    if (!existingReference) this.references.set(reference.id, reference);
     this.jobs.set(job.id, job);
     return Promise.resolve({ reference, job, created: true });
   }

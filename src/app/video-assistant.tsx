@@ -23,7 +23,7 @@ import { SvgXml } from 'react-native-svg';
 import { MediaReference } from '@/features/media-reference/media-reference';
 import { CreativeBriefCard } from '@/features/creative-brief/creative-brief-card';
 import { buildClarificationQuestions } from '@/features/creative-brief/creative-brief';
-import { getVideoAnalysisJob, retryVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
+import { getVideoAnalysisJob, retryOrRestartVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
 import { ANALYSIS_STEPS, buildCompleteQuestionAnswerPayload, buildQuestionAnswerPayload, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, recordQuestionAdvance } from '@/features/video-assistant/video-assistant-state';
 import { ViralDnaCard } from '@/features/viral-dna/viral-dna-card';
 import {
@@ -160,7 +160,18 @@ function LoadingCircle() {
   />;
 }
 
-function AnalysisStatus({ percentage, failed, onRetry }: { percentage: number; failed?: boolean; onRetry?: () => void }) {
+function analysisFailureMessage(errorCode?: string) {
+  if (errorCode === 'VIDEO_ANALYZER_UNAVAILABLE') return 'The video analyzer is temporarily unavailable.';
+  if (errorCode === 'VIDEO_ANALYZER_RATE_LIMITED') return 'The video analyzer is busy. Please retry shortly.';
+  if (errorCode === 'VIDEO_ANALYZER_AUTHENTICATION_FAILED') return 'Video analysis is temporarily unavailable.';
+  if (errorCode === 'VIDEO_ANALYZER_REQUEST_REJECTED') return 'This video could not be analyzed. Try another public YouTube video.';
+  if (errorCode === 'INVALID_ANALYSIS') return 'The analyzer returned an unusable result.';
+  if (errorCode === 'WORKER_SHUTDOWN') return 'Analysis was interrupted by a service update.';
+  if (errorCode === 'VIDEO_REFERENCE_NOT_FOUND') return 'The video reference is no longer available.';
+  return 'Analysis failed';
+}
+
+function AnalysisStatus({ percentage, failed, failureMessage, onRetry }: { percentage: number; failed?: boolean; failureMessage?: string; onRetry?: () => void }) {
   const done = percentage >= 100;
   const activeStep = getAnalysisStepIndex(percentage);
   const stepStates = getAnalysisStepStates(activeStep);
@@ -174,7 +185,7 @@ function AnalysisStatus({ percentage, failed, onRetry }: { percentage: number; f
   if (failed) {
     return <View accessibilityLiveRegion="polite" style={styles.analysisPill}>
       <View style={styles.dots}><View style={styles.dot} /><View style={[styles.dot, { opacity: .7 }]} /><View style={[styles.dot, { opacity: .4 }]} /></View>
-      <Text style={styles.analysisText}>Analysis failed</Text>
+      <Text style={styles.analysisText}>{failureMessage ?? 'Analysis failed'}</Text>
       {onRetry ? <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Retry</Text></Pressable> : null}
     </View>;
   }
@@ -266,6 +277,7 @@ export default function VideoAssistantScreen() {
   const [percentage, setPercentage] = useState(params.analysisJobId ? 0 : 8);
   const [reportedPercentage, setReportedPercentage] = useState(params.analysisJobId ? 0 : 8);
   const [analysisJob, setAnalysisJob] = useState<VideoAnalysisJob | null>(null);
+  const [analysisRequestError, setAnalysisRequestError] = useState('');
   const [analysisRun, setAnalysisRun] = useState(0);
   const [details, setDetails] = useState('');
   const [sentDetails, setSentDetails] = useState<string[]>([]);
@@ -349,18 +361,24 @@ export default function VideoAssistantScreen() {
     if (!params.analysisJobId) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let consecutiveFailures = 0;
     const poll = async () => {
       try {
         const clerkToken = await getToken();
         if (!clerkToken) throw new Error('Authentication required');
         const job = await getVideoAnalysisJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: params.analysisJobId! });
         if (cancelled) return;
+        consecutiveFailures = 0;
+        setAnalysisRequestError('');
         setAnalysisJob(job);
         setReportedPercentage(job.progress);
         if (job.progress >= 100) setPercentage(100);
         if (job.status === 'QUEUED' || job.status === 'ANALYZING') timer = setTimeout(poll, 2_000);
       } catch {
-        if (!cancelled) setAnalysisJob((current) => current ?? { id: params.analysisJobId!, referenceId: params.referenceId ?? '', status: 'FAILED', progress: 100, stage: 'Analysis failed', errorCode: 'VIDEO_ANALYSIS_REQUEST_FAILED', updatedAt: new Date().toISOString() });
+        if (cancelled) return;
+        consecutiveFailures += 1;
+        setAnalysisRequestError('Analysis status is temporarily unavailable. Reconnecting…');
+        timer = setTimeout(poll, Math.min(10_000, 2_000 * (2 ** Math.min(consecutiveFailures - 1, 2))));
       }
     };
     void poll();
@@ -558,23 +576,29 @@ export default function VideoAssistantScreen() {
   };
   const retryAnalysis = async () => {
     if (!params.analysisJobId) return;
-    if (analysisJob?.errorCode === 'VIDEO_ANALYSIS_REQUEST_FAILED') {
-      setAnalysisJob(null);
-      setPercentage(0);
-      setReportedPercentage(0);
-      setAnalysisRun((value) => value + 1);
-      return;
-    }
+    setAnalysisRequestError('');
     try {
       const clerkToken = await getToken();
       if (!clerkToken) throw new Error('Authentication required');
-      const job = await retryVideoAnalysisJob({ apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '', clerkToken, jobId: params.analysisJobId });
+      const recovered = await retryOrRestartVideoAnalysisJob({
+        apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
+        clerkToken,
+        jobId: params.analysisJobId,
+        ...(reference?.type === 'url' ? { url: reference.source } : {}),
+      });
+      const job = recovered.analysisJob;
       setAnalysisJob(job);
       setReportedPercentage(job.progress);
       setPercentage(job.progress >= 100 ? 100 : job.progress);
+      if (recovered.restarted) {
+        router.setParams({ analysisJobId: job.id, referenceId: recovered.referenceId });
+        void AccessibilityInfo.announceForAccessibility('Starting a fresh video analysis.');
+      }
       setAnalysisRun((value) => value + 1);
-    } catch {
-      void AccessibilityInfo.announceForAccessibility('Video analysis could not be retried.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Video analysis could not be retried.';
+      setAnalysisRequestError(message);
+      void AccessibilityInfo.announceForAccessibility(message);
     }
   };
 
@@ -584,7 +608,8 @@ export default function VideoAssistantScreen() {
         <ScrollView ref={conversationScrollRef} style={styles.conversationScroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[styles.conversation, compact && styles.conversationCompact]}>
             {state.generation.reference ? <UploadedMediaCard reference={state.generation.reference} /> : null}
-            <AnalysisStatus percentage={percentage} failed={analysisJob?.status === 'FAILED'} onRetry={retryAnalysis} />
+            <AnalysisStatus percentage={percentage} failed={analysisJob?.status === 'FAILED'} failureMessage={analysisRequestError || analysisFailureMessage(analysisJob?.errorCode)} onRetry={retryAnalysis} />
+            {analysisRequestError && analysisJob?.status !== 'FAILED' ? <View accessibilityLiveRegion="polite" style={styles.analysisPill}><LoadingCircle /><Text style={styles.analysisText}>{analysisRequestError}</Text></View> : null}
             {analysisJob?.status === 'COMPLETE' ? <AnalysisSummary job={analysisJob} /> : null}
             {answerMessages.map((message, index) => <View key={`answer-${index}-${message}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}
             {sentDetails.map((message, index) => <View key={`${message}-${index}`} style={styles.userBubble}><Text style={styles.userBubbleText}>{message}</Text></View>)}

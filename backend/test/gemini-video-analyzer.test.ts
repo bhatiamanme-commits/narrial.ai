@@ -37,10 +37,15 @@ describe('GeminiVideoAnalyzer', () => {
     expect(body.store).toBe(false);
   });
 
-  it('sanitizes provider errors and malformed output', async () => {
+  it('classifies provider failures without exposing response details', async () => {
     const rejected: typeof fetch = () => Promise.resolve(new Response('secret provider details', { status: 429 }));
     await expect(new GeminiVideoAnalyzer({ apiKey: 'key', model: 'model', timeoutMs: 100 }, rejected).analyze({
       provider: 'YOUTUBE', providerVideoId: 'dQw4w9WgXcQ', canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'YouTube video', thumbnailUrl: 'https://x.test/t.jpg',
-    })).rejects.toMatchObject({ code: 'VIDEO_ANALYZER_UNAVAILABLE' });
+    })).rejects.toMatchObject({ code: 'VIDEO_ANALYZER_RATE_LIMITED', message: 'The video analyzer is temporarily rate limited.' });
+
+    const rejectedRequest: typeof fetch = () => Promise.resolve(new Response('secret schema details', { status: 400 }));
+    await expect(new GeminiVideoAnalyzer({ apiKey: 'key', model: 'model', timeoutMs: 100 }, rejectedRequest).analyze({
+      provider: 'YOUTUBE', providerVideoId: 'dQw4w9WgXcQ', canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'YouTube video', thumbnailUrl: 'https://x.test/t.jpg',
+    })).rejects.toMatchObject({ code: 'VIDEO_ANALYZER_REQUEST_REJECTED', message: 'The video analyzer rejected the analysis request.' });
   });
 });

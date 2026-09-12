@@ -97,6 +97,19 @@ function parseJsonText(text: string): unknown {
   }
 }
 
+function providerResponseError(status: number): VideoAnalysisError {
+  if (status === 400 || status === 404 || status === 422) {
+    return new VideoAnalysisError('VIDEO_ANALYZER_REQUEST_REJECTED', 'The video analyzer rejected the analysis request.');
+  }
+  if (status === 401 || status === 403) {
+    return new VideoAnalysisError('VIDEO_ANALYZER_AUTHENTICATION_FAILED', 'The video analyzer is not configured correctly.');
+  }
+  if (status === 429) {
+    return new VideoAnalysisError('VIDEO_ANALYZER_RATE_LIMITED', 'The video analyzer is temporarily rate limited.');
+  }
+  return new VideoAnalysisError('VIDEO_ANALYZER_UNAVAILABLE', 'The video analyzer is temporarily unavailable.');
+}
+
 export class GeminiVideoAnalyzer implements VideoAnalyzer {
   constructor(private readonly config: GeminiConfig, private readonly fetcher: typeof fetch = fetch) {}
 
@@ -118,7 +131,7 @@ export class GeminiVideoAnalyzer implements VideoAnalyzer {
         }),
         signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
       });
-      if (!response.ok) throw new VideoAnalysisError('VIDEO_ANALYZER_UNAVAILABLE', 'The video analyzer is temporarily unavailable.');
+      if (!response.ok) throw providerResponseError(response.status);
       const text = extractText(await response.json() as unknown);
       if (!text) throw new VideoAnalysisError('INVALID_ANALYSIS', 'The analyzer returned an invalid analysis.');
       return parseVideoAnalysis(parseJsonText(text));
