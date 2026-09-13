@@ -127,7 +127,7 @@ export async function getVideoAnalysisJob(input: ApiInput & { jobId: string }): 
 export async function retryVideoAnalysisJob(input: ApiInput & { jobId: string }): Promise<VideoAnalysisJob> {
   const { apiUrl, fetcher } = requestBase(input);
   const response = await fetcher(`${apiUrl}/api/v1/video-analysis-jobs/${encodeURIComponent(input.jobId)}/retry`, {
-    method: 'POST', headers: { authorization: `Bearer ${input.clerkToken}`, 'content-type': 'application/json' },
+    method: 'POST', headers: { authorization: `Bearer ${input.clerkToken}` },
   });
   if (!response.ok) throw await parseApiError(response);
   const value: unknown = await response.json();

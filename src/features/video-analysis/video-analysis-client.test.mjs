@@ -53,6 +53,24 @@ test('preserves retry error status and code so terminal jobs can be restarted', 
   });
 });
 
+test('sends a bodyless retry request without a JSON content type', async () => {
+  let request;
+  const result = await retryVideoAnalysisJob({
+    apiUrl: 'https://api.narial.in', clerkToken: 'token', jobId: 'job-id',
+    fetch: async (url, init) => {
+      request = { url, init };
+      return new Response(JSON.stringify({ data: {
+        id: 'job-id', referenceId: 'ref-id', status: 'QUEUED', progress: 0,
+        stage: 'Queued for analysis', updatedAt: new Date().toISOString(),
+      } }), { status: 202 });
+    },
+  });
+
+  assert.equal(result.status, 'QUEUED');
+  assert.equal(request.init.body, undefined);
+  assert.equal(new Headers(request.init.headers).has('content-type'), false);
+});
+
 test('starts a fresh analysis when the prior job exhausted its retry budget', async () => {
   const requests = [];
   const result = await retryOrRestartVideoAnalysisJob({
