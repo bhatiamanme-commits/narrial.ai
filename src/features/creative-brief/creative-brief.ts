@@ -1,9 +1,17 @@
 export type ClarificationQuestion = { id: 'topic' | 'audience' | 'emotion' | 'action'; title: string; support: string; options: string[]; customOption?: string; defaultOption?: string };
 export type ClarificationAnswer = { option?: string; custom?: string; skipped?: boolean };
 
+function suppliedTopic(prompt?: string) {
+  const value = prompt?.trim();
+  if (!value) return '';
+  const normalized = value.toLowerCase().replace(/[.!?]+$/, '').replace(/\s+/g, ' ');
+  const referenceOnlyRequest = /^(?:please )?(?:generate|create|make)(?: me)? (?:an? )?(?:(?:new|original) )?(?:video|script|story|one|something) (?:(?:just )?like this|similar to this|based on this|from this)(?: (?:video|reference))?$/;
+  return referenceOnlyRequest.test(normalized) ? '' : value;
+}
+
 export function buildClarificationQuestions({ prompt }: { prompt?: string }): ClarificationQuestion[] {
   const questions: ClarificationQuestion[] = [];
-  if (!prompt?.trim()) questions.push({ id: 'topic', title: 'What should the new video be about?', support: 'This anchors the original script without copying the reference.', options: ['Explain my product', 'Promote a feature', 'Teach something', 'Custom topic'], customOption: 'Custom topic' });
+  if (!suppliedTopic(prompt)) questions.push({ id: 'topic', title: 'What should the new video be about?', support: 'This anchors the original script without copying the reference.', options: ['Explain my product', 'Promote a feature', 'Teach something', 'Custom topic'], customOption: 'Custom topic' });
   questions.push(
     { id: 'audience', title: 'Who should feel this was made for them?', support: 'Audience changes the language, examples, and pace.', options: ['Creators', 'Small businesses', 'Consumers', 'Custom audience'], customOption: 'Custom audience' },
     { id: 'emotion', title: 'Which emotion should lead the video?', support: 'This guides the voice, visuals, music, and editing intensity.', options: ['Curiosity', 'Excitement', 'Trust', 'Inspiration', 'Humour', 'Let Narial decide'], defaultOption: 'Let Narial decide' },
@@ -19,7 +27,7 @@ function answerValue(answer: ClarificationAnswer | undefined, fallback: string) 
 
 export function buildCreativeBrief(input: { prompt?: string; aspectRatio?: string }, answers: Record<string, ClarificationAnswer>) {
   return {
-    topic: input.prompt?.trim() || answerValue(answers.topic, 'Narial decides'),
+    topic: suppliedTopic(input.prompt) || answerValue(answers.topic, 'Narial decides'),
     audience: answerValue(answers.audience, 'Narial decides'),
     primaryEmotion: answerValue(answers.emotion, 'Narial decides'),
     desiredAction: answerValue(answers.action, 'No direct CTA'),

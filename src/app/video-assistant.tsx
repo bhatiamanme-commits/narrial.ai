@@ -22,7 +22,7 @@ import { SvgXml } from 'react-native-svg';
 
 import { MediaReference } from '@/features/media-reference/media-reference';
 import { CreativeBriefCard } from '@/features/creative-brief/creative-brief-card';
-import { buildClarificationQuestions } from '@/features/creative-brief/creative-brief';
+import { buildClarificationQuestions, buildCreativeBrief } from '@/features/creative-brief/creative-brief';
 import { getVideoAnalysisJob, retryOrRestartVideoAnalysisJob, VideoAnalysisJob } from '@/features/video-analysis/video-analysis-client';
 import { ANALYSIS_STEPS, buildCompleteQuestionAnswerPayload, buildQuestionAnswerPayload, getAnalysisStepIndex, getAnalysisStepStates, getNextAnalysisDisplayProgress, recordQuestionAdvance } from '@/features/video-assistant/video-assistant-state';
 import { ViralDnaCard } from '@/features/viral-dna/viral-dna-card';
@@ -434,8 +434,12 @@ export default function VideoAssistantScreen() {
     const canCreateFromCompletedAnalysis = state.complete && analysisJob?.status === 'COMPLETE' && Boolean(analysisJobId);
     if (!userId || resumeCheckCompleteForUser !== userId || storyRequested.current || (!resumableRequest && !canCreateFromCompletedAnalysis)) return;
     const request = resumableRequest ?? (() => {
-      const questionAnswers = buildCompleteQuestionAnswerPayload(state.questions, state.answers, sentDetails);
-      const prompt = state.generation.prompt.trim() || 'Create a new original story';
+      const creativeBrief = buildCreativeBrief({ prompt: state.generation.prompt, aspectRatio: state.generation.aspectRatio }, state.answers);
+      const questionAnswers = [
+        ...buildCompleteQuestionAnswerPayload(state.questions, state.answers, sentDetails),
+        { question: 'Output format', answer: creativeBrief.aspectRatio },
+      ];
+      const prompt = creativeBrief.topic === 'Narial decides' ? 'Create a new original story' : creativeBrief.topic;
       const validationError = validateScriptGenerationBrief({ prompt, questionAnswers });
       if (validationError) {
         setStoryLoading(false);
@@ -481,7 +485,7 @@ export default function VideoAssistantScreen() {
       setStoryRetryMode(retryModeForError(error, 'create'));
     }
     })();
-  }, [analysisJob?.status, getToken, params.analysisJobId, params.scriptSessionId, resumeCheckCompleteForUser, scriptIdempotencyKey, sentDetails, state.answers, state.complete, state.generation.prompt, state.questions, storyAttempt, userId]);
+  }, [analysisJob?.status, getToken, params.analysisJobId, params.scriptSessionId, resumeCheckCompleteForUser, scriptIdempotencyKey, sentDetails, state.answers, state.complete, state.generation.aspectRatio, state.generation.prompt, state.questions, storyAttempt, userId]);
   useEffect(() => {
     if (!scriptJob || (scriptJob.status !== 'QUEUED' && scriptJob.status !== 'GENERATING')) return;
     let cancelled = false;

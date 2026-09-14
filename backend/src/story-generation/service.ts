@@ -32,6 +32,7 @@ export class ScriptGenerationService {
       if (existing.requestFingerprint !== requestFingerprint) {
         throw new ScriptGenerationError('IDEMPOTENCY_KEY_REUSED', 'The idempotency key was already used for different input.');
       }
+      if (existing.status === 'QUEUED') this.worker.runSoon(existing.id, ownerId);
       return existing;
     }
     const created = await this.scripts.create({
@@ -42,14 +43,16 @@ export class ScriptGenerationService {
       globalMaxJobsPerHour: this.globalMaxJobsPerHour,
       createdAfter: new Date(Date.now() - 60 * 60 * 1_000),
     });
-    if (created.created) this.worker.runSoon(created.job.id, ownerId);
+    if (created.job.status === 'QUEUED') this.worker.runSoon(created.job.id, ownerId);
     return created.job;
   }
 
   async getJob(ownerId: string, jobId: string) {
     const job = await this.scripts.findJobForUser(jobId, ownerId);
     if (!job) return null;
-    return await this.videos.findJobForUser(job.analysisJobId, ownerId) ? job : null;
+    if (!await this.videos.findJobForUser(job.analysisJobId, ownerId)) return null;
+    if (this.enabled && job.status === 'QUEUED') this.worker.runSoon(job.id, ownerId);
+    return job;
   }
 
   async retry(ownerId: string, jobId: string) {

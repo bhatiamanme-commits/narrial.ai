@@ -12,6 +12,19 @@ test('asks for topic first when it is missing', () => {
   assert.equal(buildClarificationQuestions({ prompt: '' })[0].id, 'topic');
 });
 
+test('asks for an original topic when the prompt only points at the reference', () => {
+  const questions = buildClarificationQuestions({ prompt: 'generate a video like this' });
+  assert.deepEqual(questions.map((question) => question.id), ['topic', 'audience', 'emotion', 'action']);
+
+  const brief = buildCreativeBrief({ prompt: 'generate a video like this', aspectRatio: '9:16' }, {
+    topic: { custom: 'Show how a solo creator plans a week of content' },
+    audience: { option: 'Creators' },
+    emotion: { option: 'Excitement' },
+    action: { option: 'Comment' },
+  });
+  assert.equal(brief.topic, 'Show how a solo creator plans a week of content');
+});
+
 test('creates a normalized brief and records Narial-decided values', () => {
   const brief = buildCreativeBrief({ prompt: 'Launch a caption tool', aspectRatio: '9:16' }, {
     audience: { custom: 'Solo creators' }, emotion: { option: 'Let Narial decide' }, action: { option: 'Try the product' },

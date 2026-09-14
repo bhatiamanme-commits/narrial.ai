@@ -21,3 +21,11 @@ test('does not resume an old script over a distinct incoming reference', async (
   assert.match(screen, /const resumeMatchesIncomingSession = !params\.scriptSessionId \|\| resumable\?\.request\.clientSessionId === params\.scriptSessionId/);
   assert.match(screen, /if \(resumable && resumeMatchesIncomingReference && resumeMatchesIncomingSession\)/);
 });
+
+test('submits the resolved original topic and output format to script generation', async () => {
+  const screen = await source();
+
+  assert.match(screen, /const creativeBrief = buildCreativeBrief\(/);
+  assert.match(screen, /const prompt = creativeBrief\.topic/);
+  assert.match(screen, /question: 'Output format', answer: creativeBrief\.aspectRatio/);
+});
